@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Consistent Hashing — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0e12;
+    --panel: #15171d;
+    --panel-2: #1c1f27;
+    --ink: #e8e6df;
+    --muted: #8a8b93;
+    --accent: #d4ff3a;
+    --warn: #ff7849;
+    --srv-a: #ff7849;
+    --srv-b: #4ad6ff;
+    --srv-c: #d4ff3a;
+    --srv-d: #c084fc;
+    --srv-e: #ff5d8f;
+    --srv-f: #50e3c2;
+    --line: #2a2d36;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 24px;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(212,255,58,0.04) 0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(74,214,255,0.04) 0%, transparent 40%);
+  }
+  header {
+    max-width: 1300px;
+    margin: 0 auto 32px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+  }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  h1 .accent { color: var(--accent); font-style: italic; }
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 8px;
+    letter-spacing: 0.02em;
+  }
+  .layout {
+    max-width: 1300px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .stage {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: auto; display: block; }
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .panel h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  button {
+    font-family: inherit;
+    background: var(--panel-2);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 9px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    transition: all 0.15s ease;
+  }
+  button:hover {
+    background: #252934;
+    border-color: var(--accent);
+  }
+  button.primary {
+    background: var(--accent);
+    color: #0d0e12;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+  button.primary:hover { background: #c5ef2a; }
+  button.danger { border-color: var(--warn); color: var(--warn); }
+  button.danger:hover { background: var(--warn); color: #0d0e12; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .control-group {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+  }
+  .control-group label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+  .val {
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 32px;
+    text-align: right;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .stat {
+    background: var(--panel-2);
+    padding: 10px;
+    border-radius: 8px;
+    border-left: 3px solid var(--accent);
+  }
+  .stat .label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .stat .value {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .server-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .server-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .server-name { display: flex; align-items: center; gap: 8px; }
+  .server-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .server-load {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .narration {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 60px;
+  }
+  .key-particle {
+    animation: keyFade 0.6s ease-out forwards;
+  }
+  @keyframes keyFade {
+    0% { opacity: 0; transform: scale(0); }
+    50% { opacity: 1; transform: scale(1.3); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .key-flying {
+    transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .ring-circle {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 2;
+    stroke-dasharray: 4 6;
+  }
+  .arc-segment {
+    fill: none;
+    stroke-width: 14;
+    opacity: 0.18;
+    transition: opacity 0.3s;
+  }
+  .arc-segment.highlight { opacity: 0.55; }
+  .server-marker {
+    transition: all 0.3s ease;
+  }
+  .vnode-marker {
+    opacity: 0.7;
+  }
+  .pulse-ring {
+    animation: pulseRing 1.2s ease-out;
+    pointer-events: none;
+  }
+  @keyframes pulseRing {
+    0% { r: 8; opacity: 0.8; }
+    100% { r: 40; opacity: 0; }
+  }
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #0d0e12;
+    padding: 12px 22px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+  .footer-note {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 24px;
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Consistent <span class="accent">Hashing</span> — Visualized</h1>
+  <div class="subtitle">add keys · add/remove servers · toggle virtual nodes · watch what moves</div>
+</header>
+
+<div class="layout">
+  <div class="stage">
+    <div class="stage-label">THE HASH RING (0 → 2³²)</div>
+    <svg id="ring-svg" viewBox="0 0 600 600">
+      <circle cx="300" cy="300" r="220" class="ring-circle" />
+      <text x="300" y="60" text-anchor="middle" fill="#8a8b93" font-size="11" font-family="JetBrains Mono">0 / 2³²</text>
+      <text x="540" y="304" text-anchor="middle" fill="#8a8b93" font-size="11" font-family="JetBrains Mono">2³⁰</text>
+      <text x="300" y="555" text-anchor="middle" fill="#8a8b93" font-size="11" font-family="JetBrains Mono">2³¹</text>
+      <text x="60" y="304" text-anchor="middle" fill="#8a8b93" font-size="11" font-family="JetBrains Mono">3·2³⁰</text>
+      <g id="arcs"></g>
+      <g id="servers"></g>
+      <g id="keys"></g>
+      <g id="effects"></g>
+      <text x="300" y="295" text-anchor="middle" fill="#e8e6df" font-size="14" font-family="Fraunces" font-style="italic" id="center-label">walk →</text>
+      <text x="300" y="318" text-anchor="middle" fill="#8a8b93" font-size="10" font-family="JetBrains Mono">clockwise to find owner</text>
+    </svg>
+  </div>
+
+  <div class="sidebar">
+    <div class="panel">
+      <h2>controls</h2>
+      <div class="btn-row">
+        <button id="add-key" class="primary">+ add key</button>
+        <button id="add-many">+ 20 keys</button>
+        <button id="clear-keys">clear keys</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button id="add-server">+ add server</button>
+        <button id="remove-server" class="danger">– remove server</button>
+      </div>
+      <div class="control-group">
+        <label>virtual nodes per server</label>
+        <div class="slider-row">
+          <input type="range" id="vnodes" min="1" max="200" value="1" step="1" />
+          <span class="val" id="vnodes-val">1</span>
+        </div>
+      </div>
+      <div class="control-group">
+        <label>animation speed</label>
+        <div class="slider-row">
+          <input type="range" id="speed" min="1" max="5" value="3" step="1" />
+          <span class="val" id="speed-val">3</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>stats</h2>
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="label">servers</div>
+          <div class="value" id="stat-servers">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">total keys</div>
+          <div class="value" id="stat-keys">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">vnodes</div>
+          <div class="value" id="stat-vnodes">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">load Δ</div>
+          <div class="value" id="stat-imbalance">—</div>
+        </div>
+      </div>
+      <div class="server-list" id="server-list"></div>
+    </div>
+
+    <div class="panel">
+      <h2>what just happened</h2>
+      <div class="narration" id="narration">
+        Click <strong>+ add server</strong> a few times, then <strong>+ 20 keys</strong>. Watch where keys land. Then remove a server — notice only that server's keys move.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">tip: try vnodes = 1 → add 3 servers → 50 keys → notice the imbalance. now slide vnodes to 150.</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// CONSISTENT HASHING — CORE LOGIC
+// ============================================================
+const RING_SIZE = 2 ** 32;
+const SERVER_COLORS = [
+  { name: 'A', hex: '#ff7849' },
+  { name: 'B', hex: '#4ad6ff' },
+  { name: 'C', hex: '#d4ff3a' },
+  { name: 'D', hex: '#c084fc' },
+  { name: 'E', hex: '#ff5d8f' },
+  { name: 'F', hex: '#50e3c2' },
+];
+
+// Simple FNV-1a hash → produces a value in [0, 2^32)
+function hash(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0);
+}
+
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  servers: [],       // { id, name, color }
+  vnodesPerServer: 1,
+  ring: [],          // sorted [{ pos, serverId }]
+  keys: [],          // { id, name, pos, serverId }
+  nextServerIdx: 0,
+  nextKeyIdx: 0,
+  speed: 3,
+};
+
+function rebuildRing() {
+  state.ring = [];
+  for (const s of state.servers) {
+    for (let i = 0; i < state.vnodesPerServer; i++) {
+      const pos = hash(`${s.id}#${i}`);
+      state.ring.push({ pos, serverId: s.id });
+    }
+  }
+  state.ring.sort((a, b) => a.pos - b.pos);
+  // Reassign every key to its rightful owner
+  for (const k of state.keys) k.serverId = findOwner(k.pos);
+}
+
+function findOwner(pos) {
+  if (state.ring.length === 0) return null;
+  // Binary search for first vnode with position >= pos; wrap if needed
+  let lo = 0, hi = state.ring.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (state.ring[mid].pos < pos) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo === state.ring.length) lo = 0;
+  return state.ring[lo].serverId;
+}
+
+// ============================================================
+// GEOMETRY
+// ============================================================
+const CENTER = { x: 300, y: 300 };
+const RING_R = 220;
+
+function posToAngle(pos) {
+  // 0 at top, clockwise
+  return (pos / RING_SIZE) * 2 * Math.PI - Math.PI / 2;
+}
+function posToXY(pos, radius = RING_R) {
+  const a = posToAngle(pos);
+  return { x: CENTER.x + Math.cos(a) * radius, y: CENTER.y + Math.sin(a) * radius };
+}
+
+// SVG arc path between two positions (clockwise)
+function arcPath(fromPos, toPos, radius) {
+  let arcLen = toPos - fromPos;
+  if (arcLen < 0) arcLen += RING_SIZE;
+  const largeArc = arcLen > RING_SIZE / 2 ? 1 : 0;
+  const p1 = posToXY(fromPos, radius);
+  const p2 = posToXY(toPos, radius);
+  return `M ${p1.x} ${p1.y} A ${radius} ${radius} 0 ${largeArc} 1 ${p2.x} ${p2.y}`;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const arcsG = document.getElementById('arcs');
+const serversG = document.getElementById('servers');
+const keysG = document.getElementById('keys');
+const effectsG = document.getElementById('effects');
+const centerLabel = document.getElementById('center-label');
+
+function render() {
+  renderArcs();
+  renderServers();
+  renderKeys();
+  renderStats();
+  renderServerList();
+}
+
+function renderArcs() {
+  arcsG.innerHTML = '';
+  if (state.ring.length === 0) return;
+  // Each vnode owns the arc from previous-vnode-pos+1 to its own pos
+  for (let i = 0; i < state.ring.length; i++) {
+    const cur = state.ring[i];
+    const prev = state.ring[(i - 1 + state.ring.length) % state.ring.length];
+    const server = state.servers.find(s => s.id === cur.serverId);
+    if (!server) continue;
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', arcPath(prev.pos, cur.pos, RING_R));
+    path.setAttribute('class', 'arc-segment');
+    path.setAttribute('stroke', server.color);
+    arcsG.appendChild(path);
+  }
+}
+
+function renderServers() {
+  serversG.innerHTML = '';
+  for (const s of state.servers) {
+    for (let i = 0; i < state.vnodesPerServer; i++) {
+      const pos = hash(`${s.id}#${i}`);
+      const { x, y } = posToXY(pos);
+      const isMain = i === 0;
+      const c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('cx', x);
+      c.setAttribute('cy', y);
+      c.setAttribute('r', isMain ? 9 : 4);
+      c.setAttribute('fill', s.color);
+      c.setAttribute('stroke', '#0d0e12');
+      c.setAttribute('stroke-width', isMain ? 3 : 1);
+      c.setAttribute('class', isMain ? 'server-marker' : 'server-marker vnode-marker');
+      serversG.appendChild(c);
+
+      if (isMain) {
+        // Label outside the ring
+        const lbl = posToXY(pos, RING_R + 24);
+        const t = document.createElementNS(svgNS, 'text');
+        t.setAttribute('x', lbl.x);
+        t.setAttribute('y', lbl.y + 4);
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('fill', s.color);
+        t.setAttribute('font-family', 'JetBrains Mono');
+        t.setAttribute('font-weight', '700');
+        t.setAttribute('font-size', '14');
+        t.textContent = s.name;
+        serversG.appendChild(t);
+      }
+    }
+  }
+}
+
+function renderKeys() {
+  keysG.innerHTML = '';
+  for (const k of state.keys) {
+    const { x, y } = posToXY(k.pos, RING_R - 16);
+    const server = state.servers.find(s => s.id === k.serverId);
+    const dot = document.createElementNS(svgNS, 'circle');
+    dot.setAttribute('cx', x);
+    dot.setAttribute('cy', y);
+    dot.setAttribute('r', 3.5);
+    dot.setAttribute('fill', server ? server.color : '#666');
+    dot.setAttribute('class', 'key-particle');
+    dot.setAttribute('data-key-id', k.id);
+    keysG.appendChild(dot);
+  }
+}
+
+function renderStats() {
+  document.getElementById('stat-servers').textContent = state.servers.length;
+  document.getElementById('stat-keys').textContent = state.keys.length;
+  document.getElementById('stat-vnodes').textContent = state.servers.length * state.vnodesPerServer;
+  // Imbalance: (max-min)/avg as percentage
+  if (state.servers.length === 0 || state.keys.length === 0) {
+    document.getElementById('stat-imbalance').textContent = '—';
+    return;
+  }
+  const counts = {};
+  for (const s of state.servers) counts[s.id] = 0;
+  for (const k of state.keys) counts[k.serverId] = (counts[k.serverId] || 0) + 1;
+  const vals = Object.values(counts);
+  const max = Math.max(...vals);
+  const min = Math.min(...vals);
+  const avg = state.keys.length / state.servers.length;
+  const imb = avg > 0 ? Math.round(((max - min) / avg) * 100) : 0;
+  document.getElementById('stat-imbalance').textContent = imb + '%';
+}
+
+function renderServerList() {
+  const list = document.getElementById('server-list');
+  list.innerHTML = '';
+  const counts = {};
+  for (const s of state.servers) counts[s.id] = 0;
+  for (const k of state.keys) counts[k.serverId] = (counts[k.serverId] || 0) + 1;
+  for (const s of state.servers) {
+    const row = document.createElement('div');
+    row.className = 'server-row';
+    row.innerHTML = `
+      <div class="server-name">
+        <div class="server-dot" style="background:${s.color}"></div>
+        <span>Server ${s.name}</span>
+      </div>
+      <span class="server-load">${counts[s.id] || 0} keys</span>
+    `;
+    list.appendChild(row);
+  }
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+const speedMs = () => 1200 / state.speed;
+
+function pulseAt(pos, color = '#d4ff3a') {
+  const { x, y } = posToXY(pos, RING_R - 16);
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', x);
+  ring.setAttribute('cy', y);
+  ring.setAttribute('r', 8);
+  ring.setAttribute('fill', 'none');
+  ring.setAttribute('stroke', color);
+  ring.setAttribute('stroke-width', 2);
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  setTimeout(() => ring.remove(), 1200);
+}
+
+function drawWalk(fromPos, toPos, color) {
+  // Animated arc tracing the clockwise walk from key to its owning vnode
+  const path = document.createElementNS(svgNS, 'path');
+  path.setAttribute('d', arcPath(fromPos, toPos, RING_R - 16));
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', 3);
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke-linecap', 'round');
+  effectsG.appendChild(path);
+  const len = path.getTotalLength();
+  path.style.strokeDasharray = len;
+  path.style.strokeDashoffset = len;
+  path.style.transition = `stroke-dashoffset ${speedMs()}ms ease-out`;
+  // Force layout
+  path.getBoundingClientRect();
+  path.style.strokeDashoffset = 0;
+  setTimeout(() => {
+    path.style.transition = 'opacity 0.6s';
+    path.style.opacity = 0;
+    setTimeout(() => path.remove(), 600);
+  }, speedMs() + 200);
+}
+
+function narrate(text) {
+  document.getElementById('narration').innerHTML = text;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+function addServer() {
+  if (state.servers.length >= SERVER_COLORS.length) {
+    toast('max 6 servers in demo');
+    return;
+  }
+  const meta = SERVER_COLORS[state.nextServerIdx % SERVER_COLORS.length];
+  state.nextServerIdx++;
+  // Find a fresh letter
+  const usedNames = new Set(state.servers.map(s => s.name));
+  let name = meta.name;
+  let idx = 0;
+  while (usedNames.has(name)) name = SERVER_COLORS[++idx % SERVER_COLORS.length].name;
+
+  const prevOwners = new Map(state.keys.map(k => [k.id, k.serverId]));
+  const id = 'srv-' + Math.random().toString(36).slice(2, 8);
+  state.servers.push({ id, name, color: meta.hex });
+  rebuildRing();
+  render();
+  // Highlight which keys moved
+  let moved = 0;
+  for (const k of state.keys) {
+    if (prevOwners.get(k.id) !== k.serverId) {
+      moved++;
+      pulseAt(k.pos, meta.hex);
+    }
+  }
+  const pct = state.keys.length ? Math.round((moved / state.keys.length) * 100) : 0;
+  narrate(`<strong style="color:${meta.hex}">Server ${name}</strong> added. <strong>${moved} of ${state.keys.length}</strong> keys moved (${pct}%). With consistent hashing, only keys in ${name}'s arc on the ring get reassigned — everything else stays put.`);
+}
+
+function removeServer() {
+  if (state.servers.length === 0) return;
+  const removed = state.servers.pop();
+  const prevOwners = new Map(state.keys.map(k => [k.id, k.serverId]));
+  rebuildRing();
+  render();
+  let moved = 0;
+  for (const k of state.keys) {
+    if (prevOwners.get(k.id) !== k.serverId) {
+      moved++;
+      pulseAt(k.pos, removed.color);
+    }
+  }
+  const pct = state.keys.length ? Math.round((moved / state.keys.length) * 100) : 0;
+  narrate(`<strong style="color:${removed.color}">Server ${removed.name}</strong> removed. <strong>${moved} of ${state.keys.length}</strong> keys (${pct}%) reassigned to the next clockwise server. Compare this to <code>hash % N</code>, where ~${state.servers.length > 0 ? Math.round((1 - 1/(state.servers.length+1)) * 100) : 0}% of keys would move.`);
+}
+
+function addKey(animated = true) {
+  if (state.servers.length === 0) {
+    toast('add a server first');
+    return;
+  }
+  const name = 'k' + (++state.nextKeyIdx);
+  const pos = hash(name + '_' + Math.random());
+  const ownerId = findOwner(pos);
+  const k = { id: name, name, pos, serverId: ownerId };
+  state.keys.push(k);
+  render();
+
+  if (animated) {
+    const owner = state.servers.find(s => s.id === ownerId);
+    // Find owning vnode position
+    let ownerVnodePos = null;
+    for (let i = 0; i < state.ring.length; i++) {
+      let lo = 0, hi = state.ring.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (state.ring[mid].pos < pos) lo = mid + 1;
+        else hi = mid;
+      }
+      if (lo === state.ring.length) lo = 0;
+      ownerVnodePos = state.ring[lo].pos;
+      break;
+    }
+    if (ownerVnodePos !== null) drawWalk(pos, ownerVnodePos, owner.color);
+    pulseAt(pos, owner.color);
+    narrate(`Key <strong>${name}</strong> hashed to position <code>${pos.toLocaleString()}</code>. Walking clockwise, the first server is <strong style="color:${owner.color}">${owner.name}</strong>. That's the owner.`);
+  }
+}
+
+function addManyKeys() {
+  if (state.servers.length === 0) { toast('add a server first'); return; }
+  for (let i = 0; i < 20; i++) addKey(false);
+  narrate(`Added 20 keys. They hashed randomly across the ring; each was assigned to the next clockwise server. Watch the <em>load Δ</em> stat — that's <code>(max - min) / avg</code> across servers.`);
+}
+
+function clearKeys() {
+  state.keys = [];
+  state.nextKeyIdx = 0;
+  render();
+  narrate('Keys cleared.');
+}
+
+// ============================================================
+// WIRE-UP
+// ============================================================
+document.getElementById('add-server').addEventListener('click', addServer);
+document.getElementById('remove-server').addEventListener('click', removeServer);
+document.getElementById('add-key').addEventListener('click', () => addKey(true));
+document.getElementById('add-many').addEventListener('click', addManyKeys);
+document.getElementById('clear-keys').addEventListener('click', clearKeys);
+
+document.getElementById('vnodes').addEventListener('input', (e) => {
+  state.vnodesPerServer = parseInt(e.target.value, 10);
+  document.getElementById('vnodes-val').textContent = state.vnodesPerServer;
+  rebuildRing();
+  render();
+  if (state.servers.length > 0 && state.keys.length > 0) {
+    const counts = {};
+    for (const s of state.servers) counts[s.id] = 0;
+    for (const k of state.keys) counts[k.serverId] = (counts[k.serverId] || 0) + 1;
+    const vals = Object.values(counts);
+    const imb = Math.round(((Math.max(...vals) - Math.min(...vals)) / (state.keys.length / state.servers.length)) * 100);
+    narrate(`<strong>${state.vnodesPerServer}</strong> virtual nodes per server. Each physical server now occupies many small arcs around the ring instead of one big arc. <br/><br/>Current load imbalance: <strong style="color:var(--accent)">${imb}%</strong>. Try 1 vnode vs 150 — the difference is dramatic.`);
+  }
+});
+
+document.getElementById('speed').addEventListener('input', (e) => {
+  state.speed = parseInt(e.target.value, 10);
+  document.getElementById('speed-val').textContent = state.speed;
+});
+
+// Seed: start with 3 servers so the user sees something immediately
+addServer();
+addServer();
+addServer();
+narrate('Three servers placed on the ring. Each owns the arc <em>preceding</em> it (clockwise). Click <strong>+ 20 keys</strong> to see how keys land, then add or remove a server to see what moves.');
+render();
+</script>
+</body>
+</html>
