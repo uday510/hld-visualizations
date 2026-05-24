@@ -8,25 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    /* True black background and panels */
     --bg: #000000;
-    --panel: #0a0a0a;
-    --panel-2: #121212;
-    
-    /* Monochrome typography */
-    --ink: #f5f5f5;
-    --muted: #888888;
-    
-    /* Greyscale spectrum for accents and cards */
-    --accent: #ffffff; /* Pure white */
-    --warn: #cccccc;   /* Light grey */
-    --cyan: #aaaaaa;   /* Mid grey */
-    --purple: #999999; /* Grey */
-    --pink: #777777;   /* Dark grey */
-    --teal: #555555;   /* Dim grey */
-    
-    /* Very subtle borders */
+    --ink: #ffffff;
+    --muted: #777777;
     --line: #222222;
+    --line-light: #333333;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -35,12 +21,7 @@
     color: var(--ink);
     font-family: 'JetBrains Mono', monospace;
     min-height: 100vh;
-    padding: 24px;
-    /* Subtle white/grey ambient glows */
-    background-image:
-      radial-gradient(circle at 15% 8%, rgba(255, 255, 255, 0.03) 0%, transparent 45%),
-      radial-gradient(circle at 85% 75%, rgba(200, 200, 200, 0.03) 0%, transparent 45%),
-      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.015) 0%, transparent 60%);
+    padding: 32px;
     overflow-x: hidden;
   }
 
@@ -50,17 +31,15 @@
   .container { max-width: 1200px; margin: 0 auto; }
 
   header.hero {
-    padding: 60px 0 40px;
-    border-bottom: 1px solid var(--line);
+    padding: 40px 0;
     margin-bottom: 48px;
-    position: relative;
   }
   .breadcrumb {
     font-size: 11px;
     color: var(--muted);
-    letter-spacing: 0.2em;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
-    margin-bottom: 24px;
+    margin-bottom: 32px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -68,58 +47,35 @@
   .breadcrumb .dot {
     width: 6px; height: 6px;
     border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 10px var(--accent);
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
     animation: pulseDot 2s ease-in-out infinite;
   }
   @keyframes pulseDot {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
   }
+
   h1 {
     font-family: 'Fraunces', serif;
     font-weight: 900;
-    font-size: clamp(40px, 7vw, 96px);
-    letter-spacing: -0.03em;
-    line-height: 0.95;
-    margin-bottom: 24px;
+    font-size: clamp(36px, 6vw, 72px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 20px;
   }
-  h1 .accent { color: var(--muted); font-style: italic; }
-  h1 .underline {
-    text-decoration: underline;
-    text-decoration-thickness: 4px;
-    text-underline-offset: 8px;
-    text-decoration-color: var(--cyan);
-  }
+  h1 span { font-style: italic; color: var(--muted); }
   .lead {
-    font-size: 15px;
+    font-size: 14px;
     color: var(--muted);
-    max-width: 620px;
-    line-height: 1.7;
-    margin-bottom: 24px;
+    max-width: 600px;
+    line-height: 1.6;
   }
-  .lead strong { color: var(--ink); }
-  .meta-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .tag {
-    background: var(--panel-2);
-    border: 1px solid var(--line);
-    padding: 6px 12px;
-    border-radius: 50px;
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 0.05em;
-  }
-  .tag .glyph { color: var(--accent); margin-right: 6px; }
 
   /* ============================================================
-     SECTION
+     SECTIONS
      ============================================================ */
-  section { margin-bottom: 64px; }
+  section { margin-bottom: 80px; }
   .section-header {
     display: flex;
     align-items: baseline;
@@ -150,114 +106,105 @@
   }
 
   /* ============================================================
-     CARDS
+     GRID & CARDS
      ============================================================ */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     gap: 16px;
   }
 
   .card {
-    background: var(--panel);
+    background: var(--bg);
     border: 1px solid var(--line);
     border-radius: 16px;
-    padding: 22px;
+    padding: 24px;
     text-decoration: none;
     color: inherit;
     display: flex;
     flex-direction: column;
     position: relative;
-    overflow: hidden;
-    transition: all 0.25s ease;
-    min-height: 220px;
+    transition: all 0.2s ease;
+    min-height: 280px;
   }
-  .card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%;
-    height: 3px;
-    background: var(--card-color, var(--accent));
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.3s ease;
-  }
+  
   .card.live:hover {
-    border-color: var(--card-color, var(--accent));
-    transform: translateY(-3px);
-    box-shadow: 0 12px 40px rgba(255,255,255,0.1);
+    border-color: var(--ink);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.05);
   }
-  .card.live:hover::before { transform: scaleX(1); }
-  .card.live { cursor: pointer; }
-  .card.coming { opacity: 0.55; cursor: not-allowed; }
+  .card.coming { 
+    opacity: 0.5; 
+    cursor: not-allowed; 
+  }
 
   .card-head {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 14px;
+    align-items: center;
+    margin-bottom: 24px;
   }
+  
   .card-num {
     font-size: 11px;
     color: var(--muted);
-    letter-spacing: 0.15em;
-    font-weight: 500;
+    letter-spacing: 0.2em;
   }
-  .card-status {
-    font-size: 9px;
-    padding: 4px 9px;
+
+  /* Pills */
+  .pill {
+    font-size: 10px;
+    padding: 6px 12px;
     border-radius: 50px;
     letter-spacing: 0.15em;
     font-weight: 700;
     text-transform: uppercase;
   }
-  .card-status.live {
-    background: var(--card-color, var(--accent));
-    color: #000000;
+  .pill.live {
+    background: var(--ink);
+    color: var(--bg);
   }
-  .card-status.soon {
+  .pill.soon {
     border: 1px solid var(--line);
     color: var(--muted);
   }
 
   .card-icon {
-    font-family: 'Fraunces', serif;
-    font-size: 36px;
-    font-weight: 900;
-    font-style: italic;
-    color: var(--card-color, var(--accent));
+    font-size: 32px;
     line-height: 1;
-    margin-bottom: 8px;
+    margin-bottom: 16px;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 900;
   }
+  .card-icon svg { width: 32px; height: 32px; fill: currentColor; }
+  
   .card-title {
     font-family: 'Fraunces', serif;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
     letter-spacing: -0.01em;
-    line-height: 1.2;
   }
   .card-desc {
     font-size: 12px;
     color: var(--muted);
     line-height: 1.6;
-    margin-bottom: 16px;
+    margin-bottom: 24px;
     flex-grow: 1;
   }
+  
   .card-foot {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-top: 12px;
+    padding-top: 16px;
     border-top: 1px dashed var(--line);
   }
   .card-tags {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     flex-wrap: wrap;
-  }
-  .card-tag {
     font-size: 9px;
     color: var(--muted);
     letter-spacing: 0.1em;
@@ -265,39 +212,44 @@
   }
   .card-arrow {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 18px;
-    color: var(--card-color, var(--accent));
-    transition: transform 0.25s ease;
+    font-size: 16px;
+    color: var(--muted);
+    transition: transform 0.2s ease, color 0.2s ease;
   }
   .card.live:hover .card-arrow {
     transform: translateX(4px);
+    color: var(--ink);
   }
 
-  /* Featured card — full width, special treatment */
+  /* ============================================================
+     FEATURED CARD (Spans full width)
+     ============================================================ */
   .featured {
     grid-column: 1 / -1;
-    background: linear-gradient(135deg, var(--panel) 0%, var(--panel-2) 100%);
-    border: 1px solid var(--card-color, var(--accent));
+    border: 1px solid var(--ink);
     padding: 32px;
     min-height: auto;
+    margin-bottom: 16px;
   }
-  .featured::before { transform: scaleX(1); height: 4px; }
-  .featured .card-head { margin-bottom: 18px; }
-  .featured .card-icon { font-size: 64px; margin-bottom: 12px; }
-  .featured .card-title { font-size: 32px; margin-bottom: 12px; }
-  .featured .card-desc { font-size: 13px; max-width: 640px; }
-  .featured-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 24px;
+  .featured:hover {
+    border-color: var(--ink);
+  }
+  .featured-content-row {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
+    gap: 32px;
+    margin-bottom: 16px;
   }
-  @media (max-width: 720px) {
-    .featured-row { grid-template-columns: 1fr; }
+  .featured-text-block {
+    max-width: 640px;
   }
-  .featured-cta {
-    background: var(--card-color, var(--accent));
-    color: #000000;
+  .featured .card-icon { font-size: 48px; margin-bottom: 24px; }
+  .featured .card-title { font-size: 36px; margin-bottom: 16px; }
+  
+  .btn-play {
+    background: var(--ink);
+    color: var(--bg);
     padding: 14px 28px;
     border-radius: 50px;
     font-weight: 700;
@@ -306,26 +258,32 @@
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    transition: all 0.2s ease;
+    gap: 8px;
     white-space: nowrap;
+    transition: opacity 0.2s ease;
   }
-  .featured-cta:hover {
-    transform: translateX(4px);
-    box-shadow: 0 8px 24px rgba(255,255,255,0.2);
+  .btn-play:hover {
+    opacity: 0.8;
+  }
+  
+  @media (max-width: 768px) {
+    .featured-content-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
   }
 
   /* ============================================================
      ABOUT / FOOTER
      ============================================================ */
   .about {
-    background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 16px;
     padding: 32px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 32px;
+    margin-bottom: 48px;
   }
   @media (max-width: 720px) {
     .about { grid-template-columns: 1fr; }
@@ -341,8 +299,8 @@
     color: var(--muted);
     line-height: 1.7;
   }
-  .about a { color: var(--accent); text-decoration: none; }
-  .about a:hover { text-decoration: underline; }
+  .about a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+  .about a:hover { border-color: var(--ink); }
 
   footer {
     text-align: center;
@@ -351,27 +309,9 @@
     padding: 32px 0 16px;
     letter-spacing: 0.05em;
     border-top: 1px dashed var(--line);
-    margin-top: 48px;
   }
-  footer .heart { color: var(--warn); }
-
-  /* Decorative ring graphic in hero */
-  .hero-deco {
-    position: absolute;
-    right: -80px;
-    top: 20px;
-    width: 280px;
-    height: 280px;
-    opacity: 0.25; /* Slightly more transparent for monochrome */
-    pointer-events: none;
-  }
-  @media (max-width: 900px) { .hero-deco { display: none; } }
-  .hero-deco circle.ring {
-    fill: none;
-    stroke: var(--line);
-    stroke-width: 1;
-    stroke-dasharray: 3 5;
-  }
+  footer a { color: var(--ink); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -379,37 +319,14 @@
 <div class="container">
 
   <header class="hero">
-    <svg class="hero-deco" viewBox="0 0 280 280">
-      <circle class="ring" cx="140" cy="140" r="130"/>
-      <circle cx="140" cy="10" r="7" fill="#cccccc"/>
-      <circle cx="265" cy="160" r="7" fill="#aaaaaa"/>
-      <circle cx="60" cy="240" r="7" fill="#ffffff"/>
-      <circle cx="40" cy="80" r="5" fill="#999999" opacity="0.6"/>
-      <circle cx="200" cy="60" r="5" fill="#777777" opacity="0.6"/>
-      <circle cx="220" cy="230" r="5" fill="#555555" opacity="0.6"/>
-    </svg>
-
     <div class="breadcrumb">
       <span class="dot"></span>
       <span>viz.udayteja.com · personal study notebook</span>
     </div>
-
-    <h1>
-      System <span class="accent">Design</span><br/>
-      <span class="underline">Visualized</span>.
-    </h1>
-
+    <h1>System Design <span>Visualized.</span></h1>
     <p class="lead">
-      Interactive visualizations for High-Level Design concepts.
-      Built while preparing for HLD interviews — each topic gets its own playable demo
-      so the trade-offs become <strong>obvious by clicking, not by reading</strong>.
+      Interactive visualizations for High-Level Design concepts. Built while preparing for interviews — each topic gets its own playable demo so the trade-offs become obvious by clicking, not by reading.
     </p>
-
-    <div class="meta-row">
-      <span class="tag"><span class="glyph">+</span>by Uday Teja</span>
-      <span class="tag"><span class="glyph">⟶</span>updated regularly</span>
-      <span class="tag"><span class="glyph">★</span>open source</span>
-    </div>
   </header>
 
   <section>
@@ -418,36 +335,44 @@
       <span class="section-meta">Core building blocks</span>
     </div>
     <div class="grid">
-
-    <a href="./consistent-hashing/" class="card featured live" style="--card-color: var(--accent);">
-        <div class="featured-row">
-          <div>
-            <div class="card-head">
-              <div class="card-num">01 · 04</div>
-              <span class="card-status live">Live</span>
-            </div>
-            <div class="card-icon">◐</div>
+      
+      <a href="./consistent-hashing/" class="card featured live">
+        <div class="card-head">
+          <div class="card-num">01 · 04</div>
+          <span class="pill live">LIVE</span>
+        </div>
+        
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2A10 10 0 1 0 22 12A10 10 0 0 0 12 2ZM12 20V4A8 8 0 0 1 12 20Z"/></svg>
+        </div>
+        
+        <div class="featured-content-row">
+          <div class="featured-text-block">
             <div class="card-title">Consistent Hashing</div>
             <p class="card-desc">
-              Build a hash ring, add servers, watch keys redistribute.
-              Toggle virtual nodes from 1 to 200 and see load imbalance collapse.
-              The canonical demo for understanding why <code style="color:var(--accent)">hash % N</code>
-              fails and why distributed caches use what they use.
+              Build a hash ring, add servers, watch keys redistribute. Toggle virtual nodes from 
+              1 to 200 and see load imbalance collapse. The canonical demo for understanding why 
+              <strong>hash % N</strong> fails and why distributed caches use what they use.
             </p>
-            <div class="card-tags">
-              <span class="card-tag">▸ DISTRIBUTED CACHE</span>
-              <span class="card-tag">▸ SHARDING</span>
-              <span class="card-tag">▸ LOAD BALANCING</span>
-            </div>
           </div>
-          <span class="featured-cta">Play with it →</span>
+          <div class="featured-action-block">
+            <span class="btn-play">Play with it →</span>
+          </div>
+        </div>
+        
+        <div class="card-foot">
+          <div class="card-tags">
+            <span>▸ DISTRIBUTED CACHE</span>
+            <span>▸ SHARDING</span>
+            <span>▸ LOAD BALANCING</span>
+          </div>
         </div>
       </a>
 
-      <div class="card coming" style="--card-color: var(--cyan);">
+      <a href="./load-balancing/" class="card live">
         <div class="card-head">
           <div class="card-num">02 · 04</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⇆</div>
         <div class="card-title">Load Balancing Algorithms</div>
@@ -457,17 +382,17 @@
         </p>
         <div class="card-foot">
           <div class="card-tags">
-            <span class="card-tag">▸ L4 / L7</span>
-            <span class="card-tag">▸ TRAFFIC</span>
+            <span>▸ L4 / L7</span>
+            <span>▸ TRAFFIC</span>
           </div>
-          <span class="card-arrow">○</span>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
-      <div class="card coming" style="--card-color: var(--purple);">
+      <a href="./cap/" class="card live">
         <div class="card-head">
           <div class="card-num">03 · 04</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⛁</div>
         <div class="card-title">CAP &amp; Consistency Models</div>
@@ -477,17 +402,17 @@
         </p>
         <div class="card-foot">
           <div class="card-tags">
-            <span class="card-tag">▸ THEORY</span>
-            <span class="card-tag">▸ TRADE-OFFS</span>
+            <span>▸ THEORY</span>
+            <span>▸ TRADE-OFFS</span>
           </div>
-          <span class="card-arrow">○</span>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
-      <div class="card coming" style="--card-color: var(--warn);">
+      <a href="./dns-cdn/" class="card live">
         <div class="card-head">
           <div class="card-num">04 · 04</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⊟</div>
         <div class="card-title">DNS &amp; CDN Routing</div>
@@ -497,12 +422,12 @@
         </p>
         <div class="card-foot">
           <div class="card-tags">
-            <span class="card-tag">▸ NETWORKING</span>
-            <span class="card-tag">▸ EDGE</span>
+            <span>▸ NETWORKING</span>
+            <span>▸ EDGE</span>
           </div>
-          <span class="card-arrow">○</span>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
     </div>
   </section>
@@ -514,10 +439,10 @@
     </div>
     <div class="grid">
 
-      <div class="card coming" style="--card-color: var(--pink);">
+    <a href="./caching/" class="card live">
         <div class="card-head">
           <div class="card-num">05</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">▣</div>
         <div class="card-title">Caching Strategies</div>
@@ -526,15 +451,15 @@
           Simulate cache hits and misses, watch eviction policies in action.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ REDIS</span></div>
-          <span class="card-arrow">○</span>
+          <div class="card-tags"><span>▸ REDIS</span></div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
-      <div class="card coming" style="--card-color: var(--teal);">
+    <a href="./sharding/" class="card live">
         <div class="card-head">
           <div class="card-num">06</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⫶</div>
         <div class="card-title">Sharding Strategies</div>
@@ -543,15 +468,15 @@
           See data distribution, hot-shard problems, and rebalancing live.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ DATABASE</span></div>
-          <span class="card-arrow">○</span>
+          <div class="card-tags"><span>▸ DATABASE</span></div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>  
 
-      <div class="card coming" style="--card-color: var(--accent);">
+    <a href="./replication/" class="card live">
         <div class="card-head">
           <div class="card-num">07</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⇉</div>
         <div class="card-title">Replication &amp; Quorum</div>
@@ -560,15 +485,15 @@
           See when reads see stale data and how quorum prevents split-brain.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ DURABILITY</span></div>
-          <span class="card-arrow">○</span>
+          <div class="card-tags"><span>▸ DURABILITY</span></div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
-      <div class="card coming" style="--card-color: var(--cyan);">
+    <a href="./queue/" class="card live">
         <div class="card-head">
           <div class="card-num">08</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⇌</div>
         <div class="card-title">Message Queues &amp; Kafka</div>
@@ -577,15 +502,15 @@
           rebalancing, and back-pressure unfold visually.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ EVENT-DRIVEN</span></div>
-          <span class="card-arrow">○</span>
+          <div class="card-tags"><span>▸ EVENT-DRIVEN</span></div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
-      <div class="card coming" style="--card-color: var(--purple);">
+    <a href="./rate-limiting/" class="card live">
         <div class="card-head">
           <div class="card-num">09</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⊘</div>
         <div class="card-title">Rate Limiting</div>
@@ -594,15 +519,15 @@
           Slam the API with traffic and see how each algorithm responds.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ THROTTLING</span></div>
-          <span class="card-arrow">○</span>
+          <div class="card-tags"><span>▸ THROTTLING</span></div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
-      <div class="card coming" style="--card-color: var(--warn);">
+    <a href="./bloom-filters/" class="card live">
         <div class="card-head">
           <div class="card-num">10</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⏚</div>
         <div class="card-title">Bloom Filters</div>
@@ -611,10 +536,10 @@
           Watch false-positive rate change as the filter fills up.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ PROBABILISTIC</span></div>
-          <span class="card-arrow">○</span>
+          <div class="card-tags"><span>▸ PROBABILISTIC</span></div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
     </div>
   </section>
@@ -626,10 +551,10 @@
     </div>
     <div class="grid">
 
-      <div class="card coming" style="--card-color: var(--accent);">
+  <a href="./saga-outbox/" class="card live">
         <div class="card-head">
           <div class="card-num">11</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">↻</div>
         <div class="card-title">Saga &amp; Outbox Pattern</div>
@@ -638,15 +563,15 @@
           watch compensating actions run. Outbox pattern keeps events durable.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ MICROSERVICES</span></div>
-          <span class="card-arrow">○</span>
+          <div class="card-tags"><span>▸ MICROSERVICES</span></div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
-      <div class="card coming" style="--card-color: var(--pink);">
+  <a href="./circuit-breaker/" class="card live">
         <div class="card-head">
           <div class="card-num">12</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill live">LIVE</span>
         </div>
         <div class="card-icon">⊗</div>
         <div class="card-title">Circuit Breaker</div>
@@ -655,15 +580,15 @@
           and watch the breaker protect the system from cascade.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ RESILIENCE</span></div>
-          <span class="card-arrow">○</span>
+          <div class="card-tags"><span>▸ RESILIENCE</span></div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
-      <div class="card coming" style="--card-color: var(--teal);">
+      <!-- <div class="card coming">
         <div class="card-head">
           <div class="card-num">13</div>
-          <span class="card-status soon">Soon</span>
+          <span class="pill soon">SOON</span>
         </div>
         <div class="card-icon">⇋</div>
         <div class="card-title">Idempotency &amp; Retries</div>
@@ -672,42 +597,55 @@
           Watch idempotency keys save the day and exponential backoff calm the chaos.
         </p>
         <div class="card-foot">
-          <div class="card-tags"><span class="card-tag">▸ RELIABILITY</span></div>
+          <div class="card-tags"><span>▸ RELIABILITY</span></div>
           <span class="card-arrow">○</span>
         </div>
-      </div>
+      </div> -->
+      <a href="./idempotency/" class="card live">
+        <div class="card-head">
+          <div class="card-num">13</div>
+          <span class="pill live">LIVE</span>
+        </div>
+        <div class="card-icon">⇋</div>
+        <div class="card-title">Idempotency &amp; Retries</div>
+        <p class="card-desc">
+          Duplicate webhooks, network failures, retry storms.
+          Watch idempotency keys save the day and exponential backoff calm the chaos.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span>▸ RELIABILITY</span></div>
+          <span class="card-arrow">→</span>
+        </div>
+      </a>
 
     </div>
   </section>
 
-  <section>
-    <div class="about">
-      <div>
-        <h3>Why this exists</h3>
-        <p>
-          System design concepts live in trade-offs — and trade-offs are
-          almost impossible to feel from a textbook diagram. Building these
-          interactive demos is how I'm preparing for HLD interviews: once you
-          can move a slider and watch a metric collapse, you understand the
-          concept in your bones.
-        </p>
-      </div>
-      <div>
-        <h3>About me</h3>
-        <p>
-          I'm <strong style="color:var(--ink)">Uday Teja</strong> — backend engineer
-          <a href="https://udayteja.com" target="_blank">udayteja.com</a> ·
-          <a href="https://github.com/uday510" target="_blank">github</a> ·
-          <a href="https://leetcode.com/uday510" target="_blank">leetcode</a>
-        </p>
-      </div>
+  <div class="about">
+    <div>
+      <h3>Why this exists</h3>
+      <p>
+        System design concepts live in trade-offs — and trade-offs are
+        almost impossible to feel from a textbook diagram. Building these
+        interactive demos is how I'm preparing for HLD interviews: once you
+        can move a slider and watch a metric collapse, you understand the
+        concept in your bones.
+      </p>
     </div>
-  </section>
+    <div>
+      <h3>About me</h3>
+      <p>
+        I'm <strong style="color:var(--ink)">Uday Teja</strong> — backend engineer.<br/><br/>
+        <a href="https://udayteja.com" target="_blank">udayteja.com</a> ·
+        <a href="https://github.com/uday510" target="_blank">github</a> ·
+        <a href="https://leetcode.com/uday510" target="_blank">leetcode</a>
+      </p>
+    </div>
+  </div>
 
   <footer>
-    built with curiosity <span class="heart">♥</span> · code on
-    <a href="https://github.com/" target="_blank" style="color:var(--accent);text-decoration:none">github</a>
-    · hosted on vercel
+    built with curiosity · code on
+    <a href="https://github.com/uday510/hld-visualizations" target="_blank">github</a>
   </footer>
 
 </div>

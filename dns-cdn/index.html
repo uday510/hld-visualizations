@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DNS & CDN Routing — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic/Node colors */
+    --dns: #c084fc;   /* Purple */
+    --edge: #4ad6ff;  /* Cyan */
+    --origin: #ff7849;/* Orange */
+    --succ: #50e3c2;  /* Mint */
+    --warn: #ff4a4a;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO & BREADCRUMB
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* ============================================================
+     LAYOUT & PANELS
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 550px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .panel h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    margin-bottom: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  
+  button, select {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 20px;
+    border-radius: 50px; 
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    appearance: none;
+  }
+  
+  select {
+    width: 100%;
+    margin-bottom: 24px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px top 50%;
+    background-size: 10px auto;
+  }
+  
+  button:hover, select:hover { border-color: var(--ink); }
+  
+  button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); width: 100%; font-size: 13px; padding: 14px;}
+  button.primary:hover { opacity: 0.8; }
+  
+  button.danger { border-color: var(--line); color: var(--muted); }
+  button.danger:hover { border-color: var(--ink); color: var(--ink); }
+  
+  button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  /* ============================================================
+     STATS & NARRATION
+     ============================================================ */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-box {
+    border: 1px solid var(--line);
+    padding: 12px;
+    border-radius: 8px;
+  }
+  .stat-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .stat-val {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .val-high { color: var(--warn); }
+  .val-low { color: var(--succ); }
+
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 140px;
+  }
+  .narration strong { color: var(--ink); }
+  .tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    color: #000;
+    margin-right: 6px;
+  }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: stroke 0.3s; }
+  .node-active { stroke: var(--ink); }
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; }
+  .link-active { stroke: var(--ink); opacity: 0.6; }
+  .packet { fill: var(--ink); }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+  
+  .geo-box { fill: none; stroke: #1a1a1a; stroke-width: 1; stroke-dasharray: 4 4; rx: 8; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>DNS & <span>CDN Routing</span></h1>
+    <div class="subtitle">trace requests · geo-routing · edge caching vs origin latency</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">GLOBAL NETWORK TOPOLOGY</div>
+      <svg id="net-svg" viewBox="0 0 800 550">
+        <rect class="geo-box" x="20" y="250" width="220" height="280" />
+        <text x="130" y="515" text-anchor="middle" fill="#444" font-size="10" font-family="JetBrains Mono">REGION: US-EAST</text>
+        
+        <rect class="geo-box" x="560" y="250" width="220" height="280" />
+        <text x="670" y="515" text-anchor="middle" fill="#444" font-size="10" font-family="JetBrains Mono">REGION: EU-WEST</text>
+
+        <g id="links-layer"></g>
+        
+        <g id="nodes-layer"></g>
+        
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Request Config</h2>
+        <label style="font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; display:block; margin-bottom: 8px;">Client Location</label>
+        <select id="geo-select">
+          <option value="us">US-East (New York)</option>
+          <option value="eu">EU-West (London)</option>
+        </select>
+
+        <button id="btn-request" class="primary">Fetch Data</button>
+        
+        <div class="btn-row" style="margin-top: 16px;">
+          <button id="btn-clear" class="danger">Clear CDN Cache</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Telemetry</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Cache Status</div>
+            <div class="stat-val" id="stat-cache">—</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Total Latency</div>
+            <div class="stat-val" id="stat-latency">0 ms</div>
+          </div>
+        </div>
+
+        <div class="narration" id="narration">
+          System idle. <br/><br/>Click <strong>Fetch Data</strong> to trace a request from the client's browser, through DNS resolution, to the CDN Edge, and (if necessary) to the Origin server.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const state = {
+  clientGeo: 'us', // 'us' or 'eu'
+  isAnimating: false,
+  cache: {
+    edgeUS: false,
+    edgeEU: false
+  }
+};
+
+const GEO = {
+  clientUS: { x: 130, y: 440 },
+  clientEU: { x: 670, y: 440 },
+  edgeUS:   { x: 130, y: 310 },
+  edgeEU:   { x: 670, y: 310 },
+  dns:      { x: 400, y: 100 },
+  origin:   { x: 400, y: 400 }, // Central location
+  radius: 28
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+
+const btnRequest = document.getElementById('btn-request');
+const btnClear = document.getElementById('btn-clear');
+const geoSelect = document.getElementById('geo-select');
+const narration = document.getElementById('narration');
+const statCache = document.getElementById('stat-cache');
+const statLatency = document.getElementById('stat-latency');
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderStatic() {
+  linksG.innerHTML = '';
+  nodesG.innerHTML = '';
+  
+  const clientPos = state.clientGeo === 'us' ? GEO.clientUS : GEO.clientEU;
+
+  // Draw Links
+  drawLine(clientPos, GEO.dns, 'link-dns');
+  drawLine(clientPos, GEO.edgeUS, 'link-edge-us');
+  drawLine(clientPos, GEO.edgeEU, 'link-edge-eu');
+  drawLine(GEO.edgeUS, GEO.origin, 'link-origin-us');
+  drawLine(GEO.edgeEU, GEO.origin, 'link-origin-eu');
+
+  // Draw Nodes
+  drawClient(GEO.clientUS.x, GEO.clientUS.y, state.clientGeo === 'us');
+  drawClient(GEO.clientEU.x, GEO.clientEU.y, state.clientGeo === 'eu');
+  
+  drawNode(GEO.dns.x, GEO.dns.y, 'Auth DNS', 'var(--dns)', 'dns-node');
+  
+  // Edges reflect cache status
+  drawNode(GEO.edgeUS.x, GEO.edgeUS.y, 'Edge (US)', state.cache.edgeUS ? 'var(--succ)' : 'var(--edge)', 'edge-us-node');
+  drawNode(GEO.edgeEU.x, GEO.edgeEU.y, 'Edge (EU)', state.cache.edgeEU ? 'var(--succ)' : 'var(--edge)', 'edge-eu-node');
+  
+  drawNode(GEO.origin.x, GEO.origin.y, 'Origin DB', 'var(--origin)', 'origin-node');
+}
+
+function drawLine(p1, p2, id) {
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', p1.x);
+  line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x);
+  line.setAttribute('y2', p2.y);
+  line.setAttribute('class', 'link-line');
+  line.setAttribute('id', id);
+  linksG.appendChild(line);
+}
+
+function drawNode(x, y, label, color, id) {
+  const c = document.createElementNS(svgNS, 'circle');
+  c.setAttribute('cx', x);
+  c.setAttribute('cy', y);
+  c.setAttribute('r', GEO.radius);
+  c.setAttribute('class', 'node-bg');
+  c.style.stroke = color;
+  c.setAttribute('id', id);
+  nodesG.appendChild(c);
+
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', x);
+  t.setAttribute('y', y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', '#fff');
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '10');
+  t.setAttribute('font-weight', 'bold');
+  t.textContent = label;
+  nodesG.appendChild(t);
+}
+
+function drawClient(x, y, isActive) {
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', x - 24);
+  c.setAttribute('y', y - 16);
+  c.setAttribute('width', 48);
+  c.setAttribute('height', 32);
+  c.setAttribute('rx', 4);
+  c.setAttribute('class', 'node-bg');
+  c.style.stroke = isActive ? 'var(--ink)' : 'var(--line)';
+  nodesG.appendChild(c);
+
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', x);
+  t.setAttribute('y', y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', isActive ? '#fff' : '#555');
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '10');
+  t.textContent = 'User';
+  nodesG.appendChild(t);
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+function pulseNode(id, color) {
+  const node = document.getElementById(id);
+  if (!node) return;
+  const cx = parseFloat(node.getAttribute('cx'));
+  const cy = parseFloat(node.getAttribute('cy'));
+  const r = parseFloat(node.getAttribute('r'));
+
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', cx);
+  ring.setAttribute('cy', cy);
+  ring.setAttribute('r', r);
+  ring.setAttribute('stroke', color);
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  
+  let frame = 0;
+  function anim() {
+    frame++;
+    ring.setAttribute('r', r + (frame * 1.5));
+    ring.style.opacity = 1 - (frame / 20);
+    if(frame < 20) requestAnimationFrame(anim);
+    else ring.remove();
+  }
+  requestAnimationFrame(anim);
+}
+
+function animatePacket(start, end, color, durationMs, callback) {
+  const packet = document.createElementNS(svgNS, 'circle');
+  packet.setAttribute('r', 5);
+  packet.setAttribute('fill', color);
+  packetsG.appendChild(packet);
+
+  const startTime = performance.now();
+
+  function anim(time) {
+    let progress = (time - startTime) / durationMs;
+    if (progress >= 1) progress = 1;
+
+    // Ease in out
+    const ease = progress < .5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+    
+    const x = start.x + (end.x - start.x) * ease;
+    const y = start.y + (end.y - start.y) * ease;
+    
+    packet.setAttribute('cx', x);
+    packet.setAttribute('cy', y);
+
+    if (progress < 1) {
+      requestAnimationFrame(anim);
+    } else {
+      packet.remove();
+      if (callback) callback();
+    }
+  }
+  requestAnimationFrame(anim);
+}
+
+function setLog(step, html) {
+  let stepTag = '';
+  if (step === 'DNS') stepTag = `<span class="tag" style="background: var(--dns)">DNS</span>`;
+  if (step === 'CDN') stepTag = `<span class="tag" style="background: var(--edge)">CDN</span>`;
+  if (step === 'ORIGIN') stepTag = `<span class="tag" style="background: var(--origin)">ORIGIN</span>`;
+  if (step === 'DONE') stepTag = `<span class="tag" style="background: var(--succ)">COMPLETE</span>`;
+  
+  narration.innerHTML = `${stepTag} ${html}`;
+}
+
+// ============================================================
+// ROUTING SEQUENCE
+// ============================================================
+function runRequest() {
+  if (state.isAnimating) return;
+  state.isAnimating = true;
+  btnRequest.disabled = true;
+  btnClear.disabled = true;
+  geoSelect.disabled = true;
+
+  statCache.textContent = "—";
+  statCache.className = "stat-val";
+  statLatency.textContent = "0 ms";
+  statLatency.className = "stat-val";
+
+  const clientPos = state.clientGeo === 'us' ? GEO.clientUS : GEO.clientEU;
+  const edgePos = state.clientGeo === 'us' ? GEO.edgeUS : GEO.edgeEU;
+  const edgeId = state.clientGeo === 'us' ? 'edge-us-node' : 'edge-eu-node';
+  const cacheKey = state.clientGeo === 'us' ? 'edgeUS' : 'edgeEU';
+  
+  let currentLatency = 0;
+
+  // STEP 1: DNS Lookup
+  setLog('DNS', 'Client requests IP for <strong>api.viz.com</strong>. Request hits Authoritative DNS. The DNS sees the user is in <strong>' + (state.clientGeo==='us'?'US-East':'EU-West') + '</strong> and uses Geo-Routing to return the IP of the closest Edge Node.');
+  
+  animatePacket(clientPos, GEO.dns, '#ffffff', 500, () => {
+    pulseNode('dns-node', 'var(--dns)');
+    currentLatency += 25; 
+    statLatency.textContent = currentLatency + ' ms';
+    
+    animatePacket(GEO.dns, clientPos, 'var(--dns)', 500, () => {
+      currentLatency += 25;
+      statLatency.textContent = currentLatency + ' ms';
+      
+      // STEP 2: To Edge
+      setLog('CDN', 'Browser makes TCP/TLS connection to the assigned Edge Node and requests the data.');
+      animatePacket(clientPos, edgePos, '#ffffff', 400, () => {
+        pulseNode(edgeId, 'var(--edge)');
+        currentLatency += 15;
+        statLatency.textContent = currentLatency + ' ms';
+
+        // Check Cache
+        if (state.cache[cacheKey]) {
+          // CACHE HIT
+          setTimeout(() => {
+            statCache.textContent = "HIT";
+            statCache.className = "stat-val val-low";
+            setLog('CDN', '<strong>CACHE HIT!</strong> The Edge Node has the data in memory. It immediately returns the data to the user. The Origin server is never touched.');
+            
+            animatePacket(edgePos, clientPos, 'var(--succ)', 400, () => {
+              pulseNode(edgeId, 'var(--succ)');
+              currentLatency += 15;
+              statLatency.textContent = currentLatency + ' ms';
+              statLatency.className = "stat-val val-low";
+              finishRequest();
+            });
+          }, 300);
+
+        } else {
+          // CACHE MISS
+          statCache.textContent = "MISS";
+          statCache.className = "stat-val val-high";
+          setLog('ORIGIN', '<strong>CACHE MISS.</strong> The Edge Node does not have the data. It must proxy the request across the public internet to the centralized Origin Server.');
+          
+          animatePacket(edgePos, GEO.origin, '#ffffff', 800, () => {
+            pulseNode('origin-node', 'var(--origin)');
+            currentLatency += 120; // High latency to origin
+            statLatency.textContent = currentLatency + ' ms';
+            
+            setLog('ORIGIN', 'Origin server computes the response and sends it back to the Edge Node.');
+            
+            animatePacket(GEO.origin, edgePos, 'var(--origin)', 800, () => {
+              pulseNode(edgeId, 'var(--origin)');
+              currentLatency += 120;
+              statLatency.textContent = currentLatency + ' ms';
+              
+              setLog('CDN', 'Edge Node caches the response for future users, then delivers it to the client.');
+              state.cache[cacheKey] = true;
+              renderStatic(); // update edge node border color
+              
+              animatePacket(edgePos, clientPos, 'var(--origin)', 400, () => {
+                currentLatency += 15;
+                statLatency.textContent = currentLatency + ' ms';
+                statLatency.className = "stat-val val-high";
+                finishRequest();
+              });
+            });
+          });
+        }
+      });
+    });
+  });
+}
+
+function finishRequest() {
+  state.isAnimating = false;
+  btnRequest.disabled = false;
+  btnClear.disabled = false;
+  geoSelect.disabled = false;
+  
+  setTimeout(() => {
+    setLog('DONE', 'Request finished. Notice the massive latency difference between a Cache Hit and Cache Miss.');
+  }, 1000);
+}
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+geoSelect.addEventListener('change', (e) => {
+  state.clientGeo = e.target.value;
+  renderStatic();
+  narration.innerHTML = `Switched client to <strong>${state.clientGeo === 'us' ? 'US-East' : 'EU-West'}</strong>. Click Fetch Data to see Geo-Routing in action.`;
+});
+
+btnClear.addEventListener('click', () => {
+  state.cache.edgeUS = false;
+  state.cache.edgeEU = false;
+  renderStatic();
+  statCache.textContent = "—";
+  statCache.className = "stat-val";
+  narration.innerHTML = 'CDN Edge caches cleared. Next request will result in a <strong>Cache Miss</strong> and hit the Origin.';
+});
+
+btnRequest.addEventListener('click', runRequest);
+
+// Init
+renderStatic();
+</script>
+</body>
+</html>

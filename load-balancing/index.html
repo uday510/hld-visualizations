@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Load Balancing — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Exact colors from your root index.html */
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    --line-light: #333333;
+    
+    /* Vibrant server colors for the data nodes */
+    --srv-a: #ff7849; /* Orange */
+    --srv-b: #4ad6ff; /* Cyan */
+    --srv-c: #d4ff3a; /* Lime */
+    --srv-d: #c084fc; /* Purple */
+    --srv-e: #ff5d8f; /* Pink */
+    --srv-f: #50e3c2; /* Mint */
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO & BREADCRUMB
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* ============================================================
+     LAYOUT & PANELS
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 600px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .panel h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    margin-bottom: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  /* ============================================================
+     CONTROLS (Buttons, Select, Sliders)
+     ============================================================ */
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  button, select {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 10px 18px;
+    border-radius: 50px; /* Pill shape matching index.html */
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    appearance: none;
+  }
+  
+  select {
+    width: 100%;
+    margin-bottom: 24px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px top 50%;
+    background-size: 10px auto;
+  }
+  
+  button:hover, select:hover {
+    border-color: var(--ink);
+  }
+  
+  button.primary {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+  button.primary:hover { opacity: 0.8; }
+  
+  button.danger { border-color: var(--line); color: var(--muted); }
+  button.danger:hover { background: transparent; border-color: #ff4a4a; color: #ff4a4a; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  
+  .control-group {
+    padding-top: 20px;
+    border-top: 1px dashed var(--line);
+  }
+  .control-group label {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  input[type="range"] {
+    flex: 1;
+    accent-color: var(--ink);
+  }
+  .val {
+    font-weight: 700;
+    color: var(--ink);
+    min-width: 32px;
+    text-align: right;
+  }
+  
+  /* ============================================================
+     SERVER LIST & NARRATION
+     ============================================================ */
+  .server-list { display: flex; flex-direction: column; gap: 8px; }
+  .server-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .server-row-bg {
+    position: absolute;
+    top: 0; left: 0; height: 100%;
+    transition: width 0.3s ease;
+    z-index: 1;
+  }
+  .server-content { position: relative; z-index: 2; display: flex; justify-content: space-between; width: 100%; }
+  .server-name { display: flex; align-items: center; gap: 10px; }
+  .server-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .server-load { color: var(--muted); font-size: 11px; font-family: 'JetBrains Mono', monospace;}
+  
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 80px;
+  }
+  .narration strong { color: var(--ink); }
+  
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-lb { fill: var(--bg); stroke: var(--ink); stroke-width: 2; }
+  .node-server { stroke: var(--bg); stroke-width: 3; }
+  .connection-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; }
+  .packet { stroke: var(--bg); stroke-width: 1.5; }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Load <span>Balancing</span></h1>
+    <div class="subtitle">route traffic · toggle algorithms · manage connections</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">NETWORK TOPOLOGY</div>
+      <svg id="lb-svg" viewBox="0 0 800 600">
+        <g id="connections"></g>
+        <g id="servers"></g>
+        <g id="lb-node"></g>
+        <g id="packets"></g>
+        <g id="effects"></g>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Algorithm</h2>
+        <select id="algo-select">
+          <option value="round-robin">Round Robin</option>
+          <option value="least-connections">Least Connections</option>
+          <option value="random">Power of Two Choices (Random)</option>
+        </select>
+
+        <div class="btn-row">
+          <button id="add-server" class="primary">+ Add Server</button>
+          <button id="remove-server" class="danger">– Remove</button>
+        </div>
+
+        <div class="control-group">
+          <label>Traffic Rate (Req/Sec)</label>
+          <div class="slider-row">
+            <input type="range" id="traffic-rate" min="0" max="15" value="2" step="1" />
+            <span class="val" id="rate-val">2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Server Load</h2>
+        <div class="server-list" id="server-list"></div>
+      </div>
+
+      <div class="panel">
+        <h2>How it works</h2>
+        <div class="narration" id="narration">
+          <strong>Round Robin:</strong> Requests are distributed sequentially across the pool of servers. Best when servers have identical capacity and requests take a similar amount of time to process.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const SERVER_COLORS = [
+  { name: 'A', hex: '#ff7849' },
+  { name: 'B', hex: '#4ad6ff' },
+  { name: 'C', hex: '#d4ff3a' },
+  { name: 'D', hex: '#c084fc' },
+  { name: 'E', hex: '#ff5d8f' },
+  { name: 'F', hex: '#50e3c2' },
+];
+
+const state = {
+  servers: [],
+  packets: [],
+  algorithm: 'round-robin',
+  rrIndex: 0,
+  trafficRate: 2, 
+  lastSpawnTime: 0,
+  nextServerIdx: 0,
+  totalRequests: 0
+};
+
+// Geometry Config
+const GEO = {
+  client: { x: 50, y: 300 },
+  lb: { x: 250, y: 300 },
+  serverX: 650,
+  serverRadius: 18,
+  lbRadius: 24,
+  packetRadius: 5
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('lb-svg');
+const connG = document.getElementById('connections');
+const serverG = document.getElementById('servers');
+const lbG = document.getElementById('lb-node');
+const packetG = document.getElementById('packets');
+const effectG = document.getElementById('effects');
+const serverListDiv = document.getElementById('server-list');
+const narrationDiv = document.getElementById('narration');
+
+// ============================================================
+// CORE LOGIC
+// ============================================================
+
+function addServer() {
+  if (state.servers.length >= SERVER_COLORS.length) return;
+  const meta = SERVER_COLORS[state.nextServerIdx % SERVER_COLORS.length];
+  state.nextServerIdx++;
+  
+  state.servers.push({
+    id: 'srv-' + Math.random().toString(36).substr(2, 5),
+    name: meta.name,
+    color: meta.hex,
+    activeConnections: 0,
+    totalServed: 0
+  });
+  
+  updateGeometry();
+  renderStatic();
+  renderServerList();
+}
+
+function removeServer() {
+  if (state.servers.length <= 1) return; 
+  const removed = state.servers.pop();
+  
+  state.packets = state.packets.filter(p => p.server?.id !== removed.id);
+  
+  if (state.rrIndex >= state.servers.length) state.rrIndex = 0;
+  
+  updateGeometry();
+  renderStatic();
+  renderServerList();
+}
+
+function updateGeometry() {
+  const count = state.servers.length;
+  const spacing = 400 / (count > 1 ? count - 1 : 1);
+  const startY = count > 1 ? 100 : 300;
+  
+  state.servers.forEach((srv, i) => {
+    srv.x = GEO.serverX;
+    srv.y = count === 1 ? 300 : startY + (i * spacing);
+  });
+}
+
+function spawnPacket() {
+  if (state.servers.length === 0) return;
+  
+  state.totalRequests++;
+  
+  state.packets.push({
+    id: state.totalRequests,
+    stage: 'to-lb',
+    progress: 0,
+    color: '#ffffff', 
+    server: null,
+    speedToLb: 0.02,
+    speedToServer: 0.015,
+    processingTime: 60 + Math.random() * 60, 
+    processingProgress: 0
+  });
+}
+
+// === ROUTING ALGORITHMS ===
+function routePacket(packet) {
+  let target = null;
+  
+  if (state.algorithm === 'round-robin') {
+    target = state.servers[state.rrIndex % state.servers.length];
+    state.rrIndex++;
+  } 
+  else if (state.algorithm === 'least-connections') {
+    target = state.servers.reduce((prev, curr) => 
+      prev.activeConnections < curr.activeConnections ? prev : curr
+    );
+  }
+  else if (state.algorithm === 'random') {
+    const i1 = Math.floor(Math.random() * state.servers.length);
+    let i2 = Math.floor(Math.random() * state.servers.length);
+    if(state.servers.length > 1) while (i1 === i2) i2 = Math.floor(Math.random() * state.servers.length);
+    
+    const s1 = state.servers[i1];
+    const s2 = state.servers[i2];
+    
+    target = (s1.activeConnections <= s2.activeConnections) ? s1 : s2;
+  }
+
+  packet.server = target;
+  packet.color = target.color;
+  packet.stage = 'to-server';
+  packet.progress = 0;
+  
+  pulseAt(GEO.lb.x, GEO.lb.y, packet.color, GEO.lbRadius);
+}
+
+// ============================================================
+// RENDERING & ANIMATION LOOP
+// ============================================================
+
+function renderStatic() {
+  connG.innerHTML = '';
+  serverG.innerHTML = '';
+  lbG.innerHTML = '';
+
+  const mainLine = document.createElementNS(svgNS, 'line');
+  mainLine.setAttribute('x1', GEO.client.x);
+  mainLine.setAttribute('y1', GEO.client.y);
+  mainLine.setAttribute('x2', GEO.lb.x - GEO.lbRadius);
+  mainLine.setAttribute('y2', GEO.lb.y);
+  mainLine.setAttribute('class', 'connection-line');
+  connG.appendChild(mainLine);
+
+  const lbCirc = document.createElementNS(svgNS, 'circle');
+  lbCirc.setAttribute('cx', GEO.lb.x);
+  lbCirc.setAttribute('cy', GEO.lb.y);
+  lbCirc.setAttribute('r', GEO.lbRadius);
+  lbCirc.setAttribute('class', 'node-lb');
+  lbG.appendChild(lbCirc);
+  
+  const lbText = document.createElementNS(svgNS, 'text');
+  lbText.setAttribute('x', GEO.lb.x);
+  lbText.setAttribute('y', GEO.lb.y + 4);
+  lbText.setAttribute('text-anchor', 'middle');
+  lbText.setAttribute('fill', '#ffffff');
+  lbText.setAttribute('font-family', 'JetBrains Mono');
+  lbText.setAttribute('font-weight', '700');
+  lbText.setAttribute('font-size', '12');
+  lbText.textContent = 'LB';
+  lbG.appendChild(lbText);
+
+  state.servers.forEach(srv => {
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', GEO.lb.x + GEO.lbRadius);
+    line.setAttribute('y1', GEO.lb.y);
+    line.setAttribute('x2', srv.x - GEO.serverRadius);
+    line.setAttribute('y2', srv.y);
+    line.setAttribute('class', 'connection-line');
+    connG.appendChild(line);
+
+    const srvCirc = document.createElementNS(svgNS, 'circle');
+    srvCirc.setAttribute('cx', srv.x);
+    srvCirc.setAttribute('cy', srv.y);
+    srvCirc.setAttribute('r', GEO.serverRadius);
+    srvCirc.setAttribute('fill', srv.color);
+    srvCirc.setAttribute('class', 'node-server');
+    serverG.appendChild(srvCirc);
+
+    const srvText = document.createElementNS(svgNS, 'text');
+    srvText.setAttribute('x', srv.x + 30);
+    srvText.setAttribute('y', srv.y + 4);
+    srvText.setAttribute('fill', '#777777');
+    srvText.setAttribute('font-family', 'JetBrains Mono');
+    srvText.setAttribute('font-size', '12');
+    srvText.textContent = `Server ${srv.name}`;
+    serverG.appendChild(srvText);
+  });
+}
+
+function renderServerList() {
+  serverListDiv.innerHTML = '';
+  
+  state.servers.forEach(srv => {
+    const fillPct = Math.min(100, (srv.activeConnections / 10) * 100); 
+    
+    const row = document.createElement('div');
+    row.className = 'server-row';
+    row.innerHTML = `
+      <div class="server-row-bg" style="width: ${fillPct}%; background-color: ${srv.color}22;"></div>
+      <div class="server-content">
+        <div class="server-name">
+          <div class="server-dot" style="background:${srv.color}"></div>
+          <span>Server ${srv.name}</span>
+        </div>
+        <span class="server-load">${srv.activeConnections} active</span>
+      </div>
+    `;
+    serverListDiv.appendChild(row);
+  });
+}
+
+function pulseAt(x, y, color, baseRadius) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', x);
+  ring.setAttribute('cy', y);
+  ring.setAttribute('r', baseRadius);
+  ring.setAttribute('stroke', color);
+  ring.setAttribute('class', 'pulse-ring');
+  effectG.appendChild(ring);
+  
+  let frame = 0;
+  function anim() {
+    frame++;
+    const r = baseRadius + (frame * 1.5);
+    const op = 1 - (frame / 20);
+    if(op <= 0) { ring.remove(); return; }
+    ring.setAttribute('r', r);
+    ring.style.opacity = op;
+    requestAnimationFrame(anim);
+  }
+  requestAnimationFrame(anim);
+}
+
+function update(time) {
+  if (state.trafficRate > 0) {
+    const spawnInterval = 1000 / state.trafficRate;
+    if (time - state.lastSpawnTime > spawnInterval) {
+      spawnPacket();
+      state.lastSpawnTime = time;
+    }
+  }
+
+  let needsListRender = false;
+
+  for (let i = state.packets.length - 1; i >= 0; i--) {
+    const p = state.packets[i];
+
+    if (p.stage === 'to-lb') {
+      p.progress += p.speedToLb;
+      if (p.progress >= 1) {
+        routePacket(p);
+      }
+    } 
+    else if (p.stage === 'to-server') {
+      p.progress += p.speedToServer;
+      if (p.progress >= 1) {
+        p.stage = 'processing';
+        p.server.activeConnections++;
+        needsListRender = true;
+        pulseAt(p.server.x, p.server.y, p.color, GEO.serverRadius);
+      }
+    } 
+    else if (p.stage === 'processing') {
+      p.processingProgress++;
+      if (p.processingProgress >= p.processingTime) {
+        p.stage = 'done';
+        p.server.activeConnections = Math.max(0, p.server.activeConnections - 1);
+        p.server.totalServed++;
+        needsListRender = true;
+      }
+    }
+
+    if (p.stage === 'done') {
+      state.packets.splice(i, 1);
+    }
+  }
+
+  if (needsListRender) renderServerList();
+
+  packetG.innerHTML = '';
+  state.packets.forEach(p => {
+    let x, y;
+    if (p.stage === 'to-lb') {
+      x = GEO.client.x + (GEO.lb.x - GEO.lbRadius - GEO.client.x) * p.progress;
+      y = GEO.client.y + (GEO.lb.y - GEO.client.y) * p.progress;
+    } 
+    else if (p.stage === 'to-server') {
+      const startX = GEO.lb.x + GEO.lbRadius;
+      const startY = GEO.lb.y;
+      const endX = p.server.x - GEO.serverRadius;
+      const endY = p.server.y;
+      x = startX + (endX - startX) * p.progress;
+      y = startY + (endY - startY) * p.progress;
+    }
+    else if (p.stage === 'processing') {
+      const angle = (p.processingProgress * 0.2) + p.id;
+      const rad = GEO.serverRadius + 8;
+      x = p.server.x + Math.cos(angle) * rad;
+      y = p.server.y + Math.sin(angle) * rad;
+    }
+
+    const c = document.createElementNS(svgNS, 'circle');
+    c.setAttribute('cx', x);
+    c.setAttribute('cy', y);
+    c.setAttribute('r', p.stage === 'processing' ? GEO.packetRadius - 1.5 : GEO.packetRadius);
+    c.setAttribute('fill', p.color);
+    c.setAttribute('class', 'packet');
+    packetG.appendChild(c);
+  });
+
+  requestAnimationFrame(update);
+}
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+
+document.getElementById('add-server').addEventListener('click', addServer);
+document.getElementById('remove-server').addEventListener('click', removeServer);
+
+document.getElementById('algo-select').addEventListener('change', (e) => {
+  state.algorithm = e.target.value;
+  state.rrIndex = 0; 
+  
+  const narrations = {
+    'round-robin': '<strong>Round Robin:</strong> Requests are distributed sequentially. Simple and predictable. Works best when all servers have equal capacity and requests have uniform processing times.',
+    'least-connections': '<strong>Least Connections:</strong> The LB tracks active connections and sends new requests to the server currently doing the least work. Great for long-lived connections or variable request weights.',
+    'random': '<strong>Power of Two Choices:</strong> Picks two servers at random, then routes to the one with fewer connections. Avoids the overhead of checking <em>every</em> server in massive distributed systems, while still preventing bottlenecking.'
+  };
+  narrationDiv.innerHTML = narrations[state.algorithm];
+});
+
+document.getElementById('traffic-rate').addEventListener('input', (e) => {
+  state.trafficRate = parseInt(e.target.value, 10);
+  document.getElementById('rate-val').textContent = state.trafficRate;
+  
+  if (state.trafficRate === 0) {
+    narrationDiv.innerHTML += "<br/><br/><span style='color:#ff4a4a'>Traffic stopped. Let servers drain their queues.</span>";
+  }
+});
+
+// ============================================================
+// INIT
+// ============================================================
+addServer();
+addServer();
+addServer();
+requestAnimationFrame(update);
+
+</script>
+</body>
+</html>

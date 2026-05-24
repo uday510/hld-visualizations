@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sharding Strategies — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic Colors */
+    --router: #ffffff;
+    --shard-a: #ff7849; /* Orange */
+    --shard-b: #4ad6ff; /* Cyan */
+    --shard-c: #d4ff3a; /* Lime */
+    --succ: #50e3c2;
+    --warn: #ff4a4a;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle { font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    height: 650px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  
+  button, select {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 16px;
+    border-radius: 50px; 
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    cursor: pointer;
+  }
+  
+  select {
+    width: 100%; margin-bottom: 24px; appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat; background-position: right 16px top 50%; background-size: 10px auto;
+  }
+  
+  button:hover, select:hover { border-color: var(--ink); }
+  
+  button.action { background: var(--ink); color: var(--bg); border-color: var(--ink); flex: 1; }
+  button.action:hover { opacity: 0.8; }
+  button.danger { background: transparent; color: var(--muted); border-color: var(--line); flex: 1; }
+  button.danger:hover { color: var(--warn); border-color: var(--warn); }
+  
+  button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  /* ============================================================
+     STATS & NARRATION
+     ============================================================ */
+  .shard-stats { margin-bottom: 24px; }
+  .shard-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
+  .shard-name { display: flex; align-items: center; gap: 8px; }
+  .dot-color { width: 10px; height: 10px; border-radius: 50%; }
+  .bar-bg { flex: 1; height: 8px; background: var(--line); border-radius: 4px; margin: 0 16px; overflow: hidden; }
+  .bar-fill { height: 100%; transition: width 0.3s ease; }
+  
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 120px;
+  }
+  .narration strong { color: var(--ink); }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: stroke 0.3s; }
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; opacity: 0.5; transition: stroke 0.3s, opacity 0.3s; }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Sharding <span>Strategies</span></h1>
+    <div class="subtitle">range vs hash vs directory · trace data distribution · simulate hotspots</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">DISTRIBUTED DATABASE TOPOLOGY</div>
+      <svg id="system-svg" viewBox="0 0 800 600">
+        <g id="links-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+        <text x="400" y="270" text-anchor="middle" fill="#777" font-size="10" font-family="JetBrains Mono" id="logic-label">ROUTING LOGIC: Range [1-33], [34-66], [67-99]</text>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Configuration</h2>
+        <select id="strategy-select">
+          <option value="range">Range-Based (Keys 1-99)</option>
+          <option value="hash">Hash-Based (key % 3)</option>
+          <option value="directory">Directory (Lookup Table)</option>
+        </select>
+
+        <div class="btn-row">
+          <button id="btn-seq" class="action">Write Sequential (x5)</button>
+          <button id="btn-rand" class="action">Write Random (x5)</button>
+        </div>
+        <div class="btn-row">
+          <button id="btn-clear" class="danger">Truncate Databases</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Shard Capacity (Max 20)</h2>
+        <div class="shard-stats">
+          <div class="shard-row">
+            <div class="shard-name"><div class="dot-color" style="background:var(--shard-a)"></div>Shard A</div>
+            <div class="bar-bg"><div class="bar-fill" id="bar-a" style="background:var(--shard-a); width:0%"></div></div>
+            <div id="count-a" style="font-family:'JetBrains Mono'; font-weight:700;">0</div>
+          </div>
+          <div class="shard-row">
+            <div class="shard-name"><div class="dot-color" style="background:var(--shard-b)"></div>Shard B</div>
+            <div class="bar-bg"><div class="bar-fill" id="bar-b" style="background:var(--shard-b); width:0%"></div></div>
+            <div id="count-b" style="font-family:'JetBrains Mono'; font-weight:700;">0</div>
+          </div>
+          <div class="shard-row">
+            <div class="shard-name"><div class="dot-color" style="background:var(--shard-c)"></div>Shard C</div>
+            <div class="bar-bg"><div class="bar-fill" id="bar-c" style="background:var(--shard-c); width:0%"></div></div>
+            <div id="count-c" style="font-family:'JetBrains Mono'; font-weight:700;">0</div>
+          </div>
+        </div>
+
+        <div class="narration" id="narration">
+          <strong>Range-Based Sharding:</strong> Data is split by key ranges. <br/><br/>
+          Click <strong>Write Sequential</strong> to simulate auto-incrementing User IDs (e.g., new signups). Watch how a "Hotspot" forms.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const GEO = {
+  app:    { x: 400, y: 80, label: 'App Client', color: 'var(--ink)' },
+  router: { x: 400, y: 220, label: 'Router / Proxy', color: 'var(--ink)' },
+  lookup: { x: 600, y: 220, label: 'Lookup DB', color: '#c084fc' }, // Only for directory
+  shards: [
+    { id: 0, x: 200, y: 450, label: 'Shard A', color: 'var(--shard-a)' },
+    { id: 1, x: 400, y: 450, label: 'Shard B', color: 'var(--shard-b)' },
+    { id: 2, x: 600, y: 450, label: 'Shard C', color: 'var(--shard-c)' }
+  ]
+};
+
+const state = {
+  strategy: 'range', // range, hash, directory
+  isAnimating: false,
+  seqKey: 1,
+  maxCapacity: 20,
+  shardCounts: [0, 0, 0],
+  directoryMap: {} // key -> shardId
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+const logicLabel = document.getElementById('logic-label');
+
+const btnSeq = document.getElementById('btn-seq');
+const btnRand = document.getElementById('btn-rand');
+const btnClear = document.getElementById('btn-clear');
+const selStrategy = document.getElementById('strategy-select');
+const narration = document.getElementById('narration');
+
+// ============================================================
+// SVG RENDERING
+// ============================================================
+function renderStatic() {
+  linksG.innerHTML = ''; nodesG.innerHTML = '';
+  
+  // Links
+  drawLine(GEO.app, GEO.router, 'link-app-router');
+  GEO.shards.forEach(s => drawLine(GEO.router, s, `link-r-s${s.id}`));
+  
+  if (state.strategy === 'directory') {
+    drawLine(GEO.router, GEO.lookup, 'link-r-lookup');
+    drawCylinderNode(GEO.lookup);
+  }
+
+  // Nodes
+  drawRectNode(GEO.app);
+  drawRectNode(GEO.router, true);
+  GEO.shards.forEach(s => drawCylinderNode(s));
+}
+
+function drawLine(p1, p2, id) {
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('class', 'link-line');
+  line.setAttribute('id', id);
+  linksG.appendChild(line);
+}
+
+function drawRectNode(node, isRouter = false) {
+  const w = 120, h = 40;
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', node.x - w/2); c.setAttribute('y', node.y - h/2);
+  c.setAttribute('width', w); c.setAttribute('height', h);
+  c.setAttribute('rx', 8); c.setAttribute('class', 'node-bg');
+  c.style.stroke = node.color;
+  nodesG.appendChild(c);
+  
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', node.x); t.setAttribute('y', node.y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', node.color);
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '12'); t.setAttribute('font-weight', 'bold');
+  t.textContent = node.label;
+  nodesG.appendChild(t);
+}
+
+function drawCylinderNode(node) {
+  const r = 40;
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', node.x - r); c.setAttribute('y', node.y - r);
+  c.setAttribute('width', r*2); c.setAttribute('height', r*2);
+  c.setAttribute('rx', 12); c.setAttribute('class', 'node-bg');
+  c.style.stroke = node.color;
+  nodesG.appendChild(c);
+  
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', node.x); t.setAttribute('y', node.y - r - 12);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', node.color);
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '12'); t.setAttribute('font-weight', 'bold');
+  t.textContent = node.label;
+  nodesG.appendChild(t);
+}
+
+// ============================================================
+// ANIMATION SYSTEM (Async/Await)
+// ============================================================
+function pulseNode(node) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', node.x); ring.setAttribute('cy', node.y);
+  ring.setAttribute('r', 40); ring.setAttribute('stroke', node.color || '#fff');
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  
+  let f = 0;
+  function anim() {
+    f++;
+    ring.setAttribute('r', 40 + (f*1.5)); ring.style.opacity = 1 - (f/20);
+    if(f < 20) requestAnimationFrame(anim); else ring.remove();
+  }
+  requestAnimationFrame(anim);
+}
+
+function sendPacket(start, end, color, text = '', duration = 400) {
+  return new Promise(resolve => {
+    const packetG = document.createElementNS(svgNS, 'g');
+    const p = document.createElementNS(svgNS, 'circle');
+    p.setAttribute('r', 6); p.setAttribute('fill', color);
+    packetG.appendChild(p);
+
+    if (text) {
+      const lbl = document.createElementNS(svgNS, 'text');
+      lbl.setAttribute('y', -12); lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('fill', '#fff'); lbl.setAttribute('font-size', '11');
+      lbl.setAttribute('font-family', 'JetBrains Mono'); lbl.setAttribute('font-weight', 'bold');
+      lbl.textContent = text;
+      packetG.appendChild(lbl);
+    }
+    
+    packetsG.appendChild(packetG);
+    const sTime = performance.now();
+
+    function anim(time) {
+      let prog = (time - sTime) / duration;
+      if (prog > 1) prog = 1;
+      const ease = prog < .5 ? 2 * prog * prog : -1 + (4 - 2 * prog) * prog;
+      const x = start.x + (end.x - start.x) * ease;
+      const y = start.y + (end.y - start.y) * ease;
+      packetG.setAttribute('transform', `translate(${x},${y})`);
+
+      if (prog < 1) requestAnimationFrame(anim);
+      else { packetG.remove(); resolve(); }
+    }
+    requestAnimationFrame(anim);
+  });
+}
+
+// ============================================================
+// LOGIC & UI
+// ============================================================
+function updateStatsUI() {
+  const counts = state.shardCounts;
+  document.getElementById('count-a').textContent = counts[0];
+  document.getElementById('count-b').textContent = counts[1];
+  document.getElementById('count-c').textContent = counts[2];
+  
+  document.getElementById('bar-a').style.width = Math.min(100, (counts[0]/state.maxCapacity)*100) + '%';
+  document.getElementById('bar-b').style.width = Math.min(100, (counts[1]/state.maxCapacity)*100) + '%';
+  document.getElementById('bar-c').style.width = Math.min(100, (counts[2]/state.maxCapacity)*100) + '%';
+
+  // Hotspot detection
+  const total = counts[0] + counts[1] + counts[2];
+  if (total > 5) {
+    if (counts[0]/total > 0.6 || counts[1]/total > 0.6 || counts[2]/total > 0.6) {
+      document.getElementById('bar-a').parentElement.style.border = counts[0]/total > 0.6 ? '1px solid var(--warn)' : 'none';
+      document.getElementById('bar-b').parentElement.style.border = counts[1]/total > 0.6 ? '1px solid var(--warn)' : 'none';
+      document.getElementById('bar-c').parentElement.style.border = counts[2]/total > 0.6 ? '1px solid var(--warn)' : 'none';
+    } else {
+      document.getElementById('bar-a').parentElement.style.border = 'none';
+      document.getElementById('bar-b').parentElement.style.border = 'none';
+      document.getElementById('bar-c').parentElement.style.border = 'none';
+    }
+  }
+}
+
+function lockUI(lock) {
+  state.isAnimating = lock;
+  btnSeq.disabled = lock; btnRand.disabled = lock;
+  btnClear.disabled = lock; selStrategy.disabled = lock;
+}
+
+function determineShard(key) {
+  if (state.strategy === 'range') {
+    if (key <= 33) return 0;
+    if (key <= 66) return 1;
+    return 2;
+  } 
+  else if (state.strategy === 'hash') {
+    // Simple modulo
+    return key % 3;
+  }
+  else if (state.strategy === 'directory') {
+    if (state.directoryMap[key] === undefined) {
+      // Assign randomly on first see
+      state.directoryMap[key] = Math.floor(Math.random() * 3);
+    }
+    return state.directoryMap[key];
+  }
+}
+
+async function executeWrites(isSequential) {
+  if(state.isAnimating) return;
+  lockUI(true);
+  
+  let narrationText = isSequential 
+    ? `Writing 5 sequential keys... ` 
+    : `Writing 5 random keys... `;
+
+  for(let i=0; i<5; i++) {
+    // Check capacity
+    if(state.shardCounts.some(c => c >= state.maxCapacity)) {
+      narration.innerHTML = `<span style="color:var(--warn)"><strong>SHARD FULL!</strong></span> Please truncate databases.`;
+      break;
+    }
+
+    const key = isSequential ? state.seqKey++ : Math.floor(Math.random() * 99) + 1;
+    if (state.seqKey > 99) state.seqKey = 1; // loop
+    
+    // 1. Client -> Router
+    await sendPacket(GEO.app, GEO.router, 'var(--ink)', `k=${key}`, 300);
+    pulseNode(GEO.router);
+    
+    let shardId = 0;
+
+    // 2. Lookup logic
+    if (state.strategy === 'directory') {
+      await sendPacket(GEO.router, GEO.lookup, GEO.lookup.color, 'lookup', 250);
+      pulseNode(GEO.lookup);
+      shardId = determineShard(key);
+      await sendPacket(GEO.lookup, GEO.router, GEO.lookup.color, `shard-${shardId}`, 250);
+    } else {
+      shardId = determineShard(key);
+    }
+
+    const targetShard = GEO.shards[shardId];
+
+    // 3. Router -> Shard
+    const link = document.getElementById(`link-r-s${shardId}`);
+    link.style.stroke = targetShard.color;
+    link.style.opacity = '1';
+    
+    await sendPacket(GEO.router, targetShard, targetShard.color, '', 300);
+    
+    link.style.stroke = 'var(--line)';
+    link.style.opacity = '0.5';
+
+    pulseNode(targetShard);
+    state.shardCounts[shardId]++;
+    updateStatsUI();
+  }
+
+  // Final Narration Assessment
+  const total = state.shardCounts.reduce((a,b)=>a+b,0);
+  const maxShare = Math.max(...state.shardCounts) / total;
+  
+  if (state.strategy === 'range' && isSequential && maxShare > 0.6) {
+    narrationText += `<br/><br/><span style="color:var(--warn)"><strong>HOTSPOT DETECTED.</strong></span> Sequential writes all target the same Shard because they fall into the same range. This is the fatal flaw of Range Sharding with auto-incrementing IDs.`;
+  } else if (state.strategy === 'hash' && isSequential) {
+    narrationText += `<br/><br/><span style="color:var(--succ)"><strong>BALANCED.</strong></span> Even though keys are sequential, the hashing algorithm spreads them perfectly across all shards.`;
+  } else if (state.strategy === 'directory') {
+    narrationText += `<br/><br/>The router queries the Lookup DB for every write. This allows total control, but the Lookup DB can become a bottleneck.`;
+  } else {
+    narrationText += `Data distributed.`;
+  }
+  
+  narration.innerHTML = narrationText;
+  lockUI(false);
+}
+
+// ============================================================
+// LISTENERS & INIT
+// ============================================================
+btnSeq.addEventListener('click', () => executeWrites(true));
+btnRand.addEventListener('click', () => executeWrites(false));
+
+btnClear.addEventListener('click', () => {
+  state.shardCounts = [0,0,0];
+  state.seqKey = 1;
+  state.directoryMap = {};
+  updateStatsUI();
+  narration.innerHTML = "Databases truncated.";
+});
+
+selStrategy.addEventListener('change', (e) => {
+  state.strategy = e.target.value;
+  if(state.strategy === 'range') logicLabel.textContent = "ROUTING LOGIC: Range [1-33], [34-66], [67-99]";
+  if(state.strategy === 'hash') logicLabel.textContent = "ROUTING LOGIC: Hash (key % 3)";
+  if(state.strategy === 'directory') logicLabel.textContent = "ROUTING LOGIC: Query Lookup DB";
+  renderStatic();
+  narration.innerHTML = `Strategy changed to <strong>${e.target.options[e.target.selectedIndex].text}</strong>. Click Write Sequential to test it.`;
+});
+
+renderStatic();
+updateStatsUI();
+</script>
+</body>
+</html>

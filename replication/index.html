@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Replication & Quorum — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic Colors */
+    --client: #ffffff;
+    --coord: #d4ff3a;
+    --succ: #50e3c2;
+    --warn: #ff4a4a;
+    --stale: #ff7849;
+    
+    /* Node Colors */
+    --node-1: #ff7849;
+    --node-2: #4ad6ff;
+    --node-3: #c084fc;
+    --node-4: #ff5d8f;
+    --node-5: #50e3c2;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle { font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    height: 650px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  
+  button {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 16px;
+    border-radius: 50px; 
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+  }
+  
+  button:hover { border-color: var(--ink); }
+  
+  button.action-write { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button.action-write:hover { opacity: 0.8; }
+  button.action-read { background: transparent; color: var(--ink); border-color: var(--line); }
+  button.action-read:hover { border-color: var(--ink); }
+  
+  button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  .control-group {
+    padding-top: 16px;
+    border-top: 1px dashed var(--line);
+  }
+  .control-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .control-group label .val { font-weight: 700; color: var(--ink); }
+  
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  input[type="range"] {
+    flex: 1;
+    accent-color: var(--ink);
+  }
+
+  /* ============================================================
+     STATS & NARRATION
+     ============================================================ */
+  .quorum-math {
+    background: #111;
+    border: 1px solid var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .math-equation {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .math-status {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .status-strong { color: var(--succ); }
+  .status-weak { color: var(--stale); }
+
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 120px;
+  }
+  .narration strong { color: var(--ink); }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: stroke 0.3s; }
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; opacity: 0.5; transition: stroke 0.3s, opacity 0.3s; }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Replication & <span>Quorum</span></h1>
+    <div class="subtitle">leaderless replication · tune R, W, N · trace stale reads</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">LEADERLESS CLUSTER</div>
+      <svg id="system-svg" viewBox="0 0 800 600">
+        <g id="links-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Cluster Settings</h2>
+        
+        <div class="control-group" style="border:none; padding-top:0;">
+          <label>Total Nodes (N) <span class="val" id="val-n">3</span></label>
+          <div class="slider-row"><input type="range" id="slider-n" min="3" max="5" value="3" step="1" /></div>
+        </div>
+        
+        <div class="control-group">
+          <label>Write Quorum (W) <span class="val" id="val-w">2</span></label>
+          <div class="slider-row"><input type="range" id="slider-w" min="1" max="3" value="2" step="1" /></div>
+        </div>
+
+        <div class="control-group">
+          <label>Read Quorum (R) <span class="val" id="val-r">2</span></label>
+          <div class="slider-row"><input type="range" id="slider-r" min="1" max="3" value="2" step="1" /></div>
+        </div>
+
+        <div class="quorum-math">
+          <div class="math-equation" id="math-eq">W(2) + R(2) > N(3)</div>
+          <div class="math-status status-strong" id="math-stat">STRONG CONSISTENCY</div>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-write" class="action-write">Write v<span id="next-v">2</span></button>
+          <button id="btn-read" class="action-read">Read Data</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Event Log</h2>
+        <div class="narration" id="narration">
+          System is running a Dynamo-style leaderless architecture.<br/><br/>
+          Adjust the parameters above. If <strong>W + R > N</strong>, reads will always overlap with writes, guaranteeing fresh data.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const NODE_COLORS = ['var(--node-1)', 'var(--node-2)', 'var(--node-3)', 'var(--node-4)', 'var(--node-5)'];
+
+const GEO = {
+  client: { x: 100, y: 300, label: 'Client', color: 'var(--client)' },
+  coord:  { x: 350, y: 300, label: 'Coordinator', color: 'var(--coord)' },
+  replicaX: 650
+};
+
+const state = {
+  n: 3,
+  w: 2,
+  r: 2,
+  globalVersion: 1, // Target truth
+  isAnimating: false,
+  nodes: [] // { id, version, color, y }
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+
+const sliderN = document.getElementById('slider-n');
+const sliderW = document.getElementById('slider-w');
+const sliderR = document.getElementById('slider-r');
+const valN = document.getElementById('val-n');
+const valW = document.getElementById('val-w');
+const valR = document.getElementById('val-r');
+const mathEq = document.getElementById('math-eq');
+const mathStat = document.getElementById('math-stat');
+
+const btnWrite = document.getElementById('btn-write');
+const btnRead = document.getElementById('btn-read');
+const nextV = document.getElementById('next-v');
+const narration = document.getElementById('narration');
+
+// ============================================================
+// INIT & RENDER
+// ============================================================
+function initNodes() {
+  state.nodes = [];
+  const spacing = 500 / (state.n + 1);
+  for (let i = 0; i < state.n; i++) {
+    state.nodes.push({
+      id: i,
+      version: state.globalVersion,
+      color: NODE_COLORS[i],
+      y: 50 + ((i + 1) * spacing)
+    });
+  }
+}
+
+function updateMath() {
+  valN.textContent = state.n;
+  valW.textContent = state.w;
+  valR.textContent = state.r;
+  
+  const sum = state.w + state.r;
+  mathEq.innerHTML = `W(${state.w}) + R(${state.r}) ${sum > state.n ? '>' : '≤'} N(${state.n})`;
+  
+  if (sum > state.n) {
+    mathStat.textContent = "STRONG CONSISTENCY";
+    mathStat.className = "math-status status-strong";
+  } else {
+    mathStat.textContent = "EVENTUAL CONSISTENCY (STALE READS)";
+    mathStat.className = "math-status status-weak";
+  }
+}
+
+function renderStatic() {
+  linksG.innerHTML = ''; nodesG.innerHTML = '';
+  
+  // Link Client -> Coord
+  drawLine(GEO.client, GEO.coord, 'link-c-coord');
+
+  // Links Coord -> Nodes
+  state.nodes.forEach(node => {
+    drawLine(GEO.coord, {x: GEO.replicaX, y: node.y}, `link-coord-n${node.id}`);
+  });
+
+  // Draw Nodes
+  drawRectNode(GEO.client);
+  drawRectNode(GEO.coord);
+  
+  state.nodes.forEach(node => {
+    drawCylinderNode({ x: GEO.replicaX, y: node.y, color: node.color, label: `Node ${node.id+1}` }, node.version);
+  });
+}
+
+function drawLine(p1, p2, id) {
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('class', 'link-line');
+  line.setAttribute('id', id);
+  linksG.appendChild(line);
+}
+
+function drawRectNode(node) {
+  const w = 100, h = 40;
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', node.x - w/2); c.setAttribute('y', node.y - h/2);
+  c.setAttribute('width', w); c.setAttribute('height', h);
+  c.setAttribute('rx', 8); c.setAttribute('class', 'node-bg');
+  c.style.stroke = node.color;
+  nodesG.appendChild(c);
+  
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', node.x); t.setAttribute('y', node.y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', node.color);
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '12'); t.setAttribute('font-weight', 'bold');
+  t.textContent = node.label;
+  nodesG.appendChild(t);
+}
+
+function drawCylinderNode(node, version) {
+  const r = 35;
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', node.x - r); c.setAttribute('y', node.y - r);
+  c.setAttribute('width', r*2); c.setAttribute('height', r*2);
+  c.setAttribute('rx', 12); c.setAttribute('class', 'node-bg');
+  c.style.stroke = node.color;
+  nodesG.appendChild(c);
+  
+  const tLabel = document.createElementNS(svgNS, 'text');
+  tLabel.setAttribute('x', node.x); tLabel.setAttribute('y', node.y - r - 8);
+  tLabel.setAttribute('text-anchor', 'middle');
+  tLabel.setAttribute('fill', node.color);
+  tLabel.setAttribute('font-family', 'JetBrains Mono');
+  tLabel.setAttribute('font-size', '11');
+  tLabel.textContent = node.label;
+  nodesG.appendChild(tLabel);
+
+  const tVal = document.createElementNS(svgNS, 'text');
+  tVal.setAttribute('x', node.x); tVal.setAttribute('y', node.y + 6);
+  tVal.setAttribute('text-anchor', 'middle');
+  tVal.setAttribute('fill', '#fff');
+  tVal.setAttribute('font-family', 'JetBrains Mono');
+  tVal.setAttribute('font-size', '18'); tVal.setAttribute('font-weight', 'bold');
+  tVal.setAttribute('id', `text-n${node.label.replace('Node ', '') - 1}`);
+  tVal.textContent = `v${version}`;
+  nodesG.appendChild(tVal);
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+function pulseNode(x, y, color) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', x); ring.setAttribute('cy', y);
+  ring.setAttribute('r', 40); ring.setAttribute('stroke', color);
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  
+  let f = 0;
+  function anim() {
+    f++;
+    ring.setAttribute('r', 40 + (f*1.5)); ring.style.opacity = 1 - (f/20);
+    if(f < 20) requestAnimationFrame(anim); else ring.remove();
+  }
+  requestAnimationFrame(anim);
+}
+
+function sendPackets(start, targets, color, text = '', duration = 500) {
+  return new Promise(resolve => {
+    let completed = 0;
+    
+    targets.forEach(target => {
+      const packetG = document.createElementNS(svgNS, 'g');
+      const p = document.createElementNS(svgNS, 'circle');
+      p.setAttribute('r', 5); p.setAttribute('fill', color);
+      packetG.appendChild(p);
+
+      if (text) {
+        const lbl = document.createElementNS(svgNS, 'text');
+        lbl.setAttribute('y', -10); lbl.setAttribute('text-anchor', 'middle');
+        lbl.setAttribute('fill', '#fff'); lbl.setAttribute('font-size', '10');
+        lbl.setAttribute('font-family', 'JetBrains Mono');
+        lbl.textContent = text;
+        packetG.appendChild(lbl);
+      }
+      
+      packetsG.appendChild(packetG);
+      const sTime = performance.now();
+
+      function anim(time) {
+        let prog = (time - sTime) / duration;
+        if (prog > 1) prog = 1;
+        const ease = prog < .5 ? 2 * prog * prog : -1 + (4 - 2 * prog) * prog;
+        
+        const x = start.x + (target.x - start.x) * ease;
+        const y = start.y + (target.y - start.y) * ease;
+        packetG.setAttribute('transform', `translate(${x},${y})`);
+
+        if (prog < 1) {
+          requestAnimationFrame(anim);
+        } else {
+          packetG.remove();
+          completed++;
+          if (completed === targets.length) resolve();
+        }
+      }
+      requestAnimationFrame(anim);
+    });
+  });
+}
+
+function shuffle(array) {
+  let currentIndex = array.length, randomIndex;
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+  }
+  return array;
+}
+
+// ============================================================
+// LOGIC ACTIONS
+// ============================================================
+function lockUI(lock) {
+  state.isAnimating = lock;
+  btnWrite.disabled = lock; btnRead.disabled = lock;
+  sliderN.disabled = lock; sliderW.disabled = lock; sliderR.disabled = lock;
+}
+
+async function doWrite() {
+  if (state.isAnimating) return;
+  lockUI(true);
+  
+  state.globalVersion++;
+  const v = state.globalVersion;
+  nextV.textContent = v + 1; // update button for next time
+
+  narration.innerHTML = `<strong>Write v${v}:</strong> Client sends data to Coordinator.`;
+  await sendPackets(GEO.client, [GEO.coord], 'var(--client)', `v${v}`);
+  pulseNode(GEO.coord.x, GEO.coord.y, GEO.coord.color);
+
+  // Pick W random nodes to write to
+  const shuffled = shuffle([...state.nodes]);
+  const targets = shuffled.slice(0, state.w);
+  const targetCoords = targets.map(n => ({x: GEO.replicaX, y: n.y}));
+
+  narration.innerHTML += `<br/>Coordinator forwards to <strong>${state.w} random nodes (W=${state.w})</strong>.`;
+  
+  // Highlight links
+  targets.forEach(t => { document.getElementById(`link-coord-n${t.id}`).style.opacity = '1'; });
+  
+  await sendPackets(GEO.coord, targetCoords, 'var(--succ)', `v${v}`, 600);
+  
+  // Apply writes
+  targets.forEach(t => {
+    t.version = v;
+    document.getElementById(`text-n${t.id}`).textContent = `v${v}`;
+    pulseNode(GEO.replicaX, t.y, t.color);
+    document.getElementById(`link-coord-n${t.id}`).style.opacity = '0.5'; // reset
+  });
+
+  narration.innerHTML += `<br/><br/>Write acknowledged. Note that <strong>${state.n - state.w} nodes</strong> did not get the update and are now storing stale data.`;
+  
+  await sendPackets(GEO.coord, [GEO.client], 'var(--succ)', 'ACK');
+  pulseNode(GEO.client.x, GEO.client.y, GEO.client.color);
+  lockUI(false);
+}
+
+async function doRead() {
+  if (state.isAnimating) return;
+  lockUI(true);
+  
+  narration.innerHTML = `<strong>Read:</strong> Client requests data.`;
+  await sendPackets(GEO.client, [GEO.coord], 'var(--client)', 'READ');
+  pulseNode(GEO.coord.x, GEO.coord.y, GEO.coord.color);
+
+  // Pick R random nodes to read from
+  const shuffled = shuffle([...state.nodes]);
+  const targets = shuffled.slice(0, state.r);
+  const targetCoords = targets.map(n => ({x: GEO.replicaX, y: n.y}));
+
+  narration.innerHTML += `<br/>Coordinator queries <strong>${state.r} random nodes (R=${state.r})</strong>.`;
+  
+  // Highlight links
+  targets.forEach(t => { document.getElementById(`link-coord-n${t.id}`).style.opacity = '1'; });
+  
+  await sendPackets(GEO.coord, targetCoords, 'var(--client)', 'req', 400);
+  
+  // Pulse nodes
+  targets.forEach(t => pulseNode(GEO.replicaX, t.y, t.color));
+  
+  // Send packets back
+  await sendPackets({x: GEO.replicaX, y: 300}, [], 'transparent'); // fake delay
+  
+  // Send actual data packets back to coordinator
+  const returnPromises = targets.map(t => {
+    document.getElementById(`link-coord-n${t.id}`).style.opacity = '0.5';
+    return sendPackets({x: GEO.replicaX, y: t.y}, [GEO.coord], t.color, `v${t.version}`, 500);
+  });
+  await Promise.all(returnPromises);
+
+  pulseNode(GEO.coord.x, GEO.coord.y, GEO.coord.color);
+
+  // Resolve Version
+  const versionsFound = targets.map(t => t.version);
+  const maxVersion = Math.max(...versionsFound);
+  const isFresh = maxVersion === state.globalVersion;
+  
+  if (isFresh) {
+    narration.innerHTML += `<br/><br/><strong style="color:var(--succ)">FRESH READ.</strong> The coordinator found v${maxVersion}.`;
+    await sendPackets(GEO.coord, [GEO.client], 'var(--succ)', `v${maxVersion}`);
+  } else {
+    narration.innerHTML += `<br/><br/><strong style="color:var(--stale)">STALE READ!</strong> The highest version the coordinator found was v${maxVersion}, but the global version is v${state.globalVersion}. This happened because your read nodes did not overlap with the previously written nodes.`;
+    await sendPackets(GEO.coord, [GEO.client], 'var(--stale)', `v${maxVersion}`);
+  }
+  
+  pulseNode(GEO.client.x, GEO.client.y, isFresh ? 'var(--succ)' : 'var(--stale)');
+  lockUI(false);
+}
+
+// ============================================================
+// LISTENERS
+// ============================================================
+sliderN.addEventListener('input', (e) => {
+  state.n = parseInt(e.target.value, 10);
+  sliderW.max = state.n;
+  sliderR.max = state.n;
+  if (state.w > state.n) state.w = state.n;
+  if (state.r > state.n) state.r = state.n;
+  sliderW.value = state.w;
+  sliderR.value = state.r;
+  
+  initNodes();
+  renderStatic();
+  updateMath();
+});
+
+sliderW.addEventListener('input', (e) => {
+  state.w = parseInt(e.target.value, 10);
+  updateMath();
+});
+
+sliderR.addEventListener('input', (e) => {
+  state.r = parseInt(e.target.value, 10);
+  updateMath();
+});
+
+btnWrite.addEventListener('click', doWrite);
+btnRead.addEventListener('click', doRead);
+
+// Start
+initNodes();
+renderStatic();
+updateMath();
+
+</script>
+</body>
+</html>

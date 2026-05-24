@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Bloom Filters — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic Colors */
+    --succ: #50e3c2;
+    --warn: #ff4a4a;
+    --stale: #ff7849;
+    
+    /* Hash Function Colors */
+    --h1: #4ad6ff; /* Cyan */
+    --h2: #d4ff3a; /* Lime */
+    --h3: #ff5d8f; /* Pink */
+    --h4: #c084fc; /* Purple */
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle { font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    height: 650px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  
+  input[type="text"] {
+    width: 100%;
+    background: #0a0a0a;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    margin-bottom: 12px;
+    outline: none;
+    transition: border-color 0.2s ease;
+  }
+  input[type="text"]:focus { border-color: var(--ink); }
+
+  button {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 16px;
+    border-radius: 50px; 
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+  }
+  
+  button:hover { border-color: var(--ink); }
+  
+  button.action-add { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button.action-add:hover { opacity: 0.8; }
+  button.action-chk { background: transparent; color: var(--ink); border-color: var(--line); }
+  button.action-chk:hover { border-color: var(--ink); }
+  button.danger { background: transparent; color: var(--muted); border-color: var(--line); }
+  button.danger:hover { color: var(--warn); border-color: var(--warn); }
+  
+  button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  .control-group {
+    padding-top: 16px;
+    border-top: 1px dashed var(--line);
+  }
+  .control-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .control-group label .val { font-weight: 700; color: var(--ink); }
+  
+  .slider-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  input[type="range"] { flex: 1; accent-color: var(--ink); }
+
+  /* ============================================================
+     STATS & NARRATION
+     ============================================================ */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-box { border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .val-warn { color: var(--stale); }
+
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 140px;
+  }
+  .narration strong { color: var(--ink); }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .bit-cell { fill: #0a0a0a; stroke: var(--line); stroke-width: 1; transition: all 0.2s; }
+  .bit-text { fill: var(--muted); font-size: 10px; font-family: 'JetBrains Mono'; text-anchor: middle; dominant-baseline: middle; user-select: none; }
+  
+  .bit-on { fill: #222; stroke: var(--ink); }
+  .bit-text-on { fill: var(--ink); font-weight: bold; }
+
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Bloom <span>Filters</span></h1>
+    <div class="subtitle">probabilistic structures · bits & hashes · false positive rates</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">MEMORY: 100-BIT ARRAY</div>
+      <svg id="system-svg" viewBox="0 0 800 600">
+        <g id="links-layer"></g>
+        <g id="grid-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="packets-layer"></g>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Operations</h2>
+        <input type="text" id="input-text" placeholder="Enter a string (e.g. apple)" autocomplete="off" />
+        <div class="btn-row">
+          <button id="btn-add" class="action-add">Add to Set</button>
+          <button id="btn-chk" class="action-chk">Check if Present</button>
+        </div>
+        
+        <div class="control-group">
+          <label>Hash Functions (k) <span class="val" id="val-k">3</span></label>
+          <div class="slider-row"><input type="range" id="slider-k" min="1" max="4" value="3" step="1" /></div>
+        </div>
+
+        <div class="btn-row" style="margin-top: 16px;">
+          <button id="btn-rand" class="action-chk" style="flex:2">Add Random</button>
+          <button id="btn-clear" class="danger" style="flex:1">Clear</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Filter Metrics</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Items Inserted (n)</div>
+            <div class="stat-val" id="stat-n">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Bits Set</div>
+            <div class="stat-val" id="stat-bits">0%</div>
+          </div>
+          <div class="stat-box" style="grid-column: 1 / -1;">
+            <div class="stat-label">False Positive Probability (p)</div>
+            <div class="stat-val" id="stat-p">0.00%</div>
+          </div>
+        </div>
+
+        <div class="narration" id="narration">
+          <strong>Bloom Filter:</strong> A highly space-efficient data structure. <br/><br/>
+          Type a word and hit <strong>Add</strong>. It will be passed through $k$ hash functions to turn $k$ bits to 1.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const m = 100; // Bit array size (10x10 grid)
+const cols = 10;
+const cellSize = 40;
+const gridStartX = 200;
+const gridStartY = 150;
+
+const HASH_COLORS = ['var(--h1)', 'var(--h2)', 'var(--h3)', 'var(--h4)'];
+
+const state = {
+  k: 3,
+  bits: new Array(m).fill(0),
+  items: new Set(), // Ground truth to detect actual false positives
+  isAnimating: false
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const gridG = document.getElementById('grid-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+
+const inputTxt = document.getElementById('input-text');
+const btnAdd = document.getElementById('btn-add');
+const btnChk = document.getElementById('btn-chk');
+const btnRand = document.getElementById('btn-rand');
+const btnClear = document.getElementById('btn-clear');
+const sliderK = document.getElementById('slider-k');
+const valK = document.getElementById('val-k');
+
+const statN = document.getElementById('stat-n');
+const statBits = document.getElementById('stat-bits');
+const statP = document.getElementById('stat-p');
+const narration = document.getElementById('narration');
+
+// ============================================================
+// HASHING LOGIC
+// ============================================================
+// Simple string hash with different prime seeds to simulate k hashes
+function getHashes(str, k, max) {
+  const hashes = [];
+  const seeds = [31, 37, 41, 43];
+  
+  for(let j=0; j<k; j++) {
+    let h = seeds[j];
+    for(let i=0; i<str.length; i++) {
+      h = Math.imul(seeds[j], h) + str.charCodeAt(i) | 0;
+    }
+    hashes.push(Math.abs(h) % max);
+  }
+  return hashes;
+}
+
+// ============================================================
+// SVG RENDERING
+// ============================================================
+function initGrid() {
+  gridG.innerHTML = '';
+  for(let i=0; i<m; i++) {
+    const x = gridStartX + (i % cols) * (cellSize + 4);
+    const y = gridStartY + Math.floor(i / cols) * (cellSize + 4);
+    
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', x); rect.setAttribute('y', y);
+    rect.setAttribute('width', cellSize); rect.setAttribute('height', cellSize);
+    rect.setAttribute('rx', 4);
+    rect.setAttribute('class', 'bit-cell');
+    rect.setAttribute('id', `bit-${i}`);
+    gridG.appendChild(rect);
+
+    const txt = document.createElementNS(svgNS, 'text');
+    txt.setAttribute('x', x + cellSize/2); txt.setAttribute('y', y + cellSize/2 + 1);
+    txt.setAttribute('class', 'bit-text');
+    txt.setAttribute('id', `bit-txt-${i}`);
+    txt.textContent = '0';
+    gridG.appendChild(txt);
+  }
+}
+
+function updateGridUI() {
+  let bitsSet = 0;
+  for(let i=0; i<m; i++) {
+    const rect = document.getElementById(`bit-${i}`);
+    const txt = document.getElementById(`bit-txt-${i}`);
+    if (state.bits[i] === 1) {
+      rect.setAttribute('class', 'bit-cell bit-on');
+      txt.setAttribute('class', 'bit-text bit-text-on');
+      txt.textContent = '1';
+      bitsSet++;
+    } else {
+      rect.setAttribute('class', 'bit-cell');
+      txt.setAttribute('class', 'bit-text');
+      txt.textContent = '0';
+    }
+  }
+  return bitsSet;
+}
+
+function getGridPos(index) {
+  return {
+    x: gridStartX + (index % cols) * (cellSize + 4) + cellSize/2,
+    y: gridStartY + Math.floor(index / cols) * (cellSize + 4) + cellSize/2
+  };
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+function drawInputNode(text, yPos) {
+  const g = document.createElementNS(svgNS, 'g');
+  
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('x', 400 - 60); rect.setAttribute('y', yPos - 20);
+  rect.setAttribute('width', 120); rect.setAttribute('height', 40);
+  rect.setAttribute('rx', 20); rect.setAttribute('fill', '#0a0a0a'); rect.setAttribute('stroke', 'var(--ink)');
+  g.appendChild(rect);
+
+  const txt = document.createElementNS(svgNS, 'text');
+  txt.setAttribute('x', 400); txt.setAttribute('y', yPos + 4);
+  txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', 'var(--ink)');
+  txt.setAttribute('font-family', 'JetBrains Mono'); txt.setAttribute('font-size', '12');
+  txt.textContent = text;
+  g.appendChild(txt);
+  
+  nodesG.appendChild(g);
+  return g;
+}
+
+function sendHashPackets(startY, indices, colors, duration) {
+  return new Promise(resolve => {
+    let completed = 0;
+    
+    indices.forEach((index, i) => {
+      const target = getGridPos(index);
+      
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', 400); line.setAttribute('y1', startY);
+      line.setAttribute('x2', target.x); line.setAttribute('y2', target.y);
+      line.setAttribute('stroke', colors[i]); line.setAttribute('stroke-width', 2);
+      line.setAttribute('stroke-dasharray', '4 4'); line.setAttribute('opacity', 0.5);
+      linksG.appendChild(line);
+
+      const packet = document.createElementNS(svgNS, 'circle');
+      packet.setAttribute('r', 6); packet.setAttribute('fill', colors[i]);
+      packetsG.appendChild(packet);
+
+      const sTime = performance.now();
+      function anim(time) {
+        let prog = (time - sTime) / duration;
+        if (prog > 1) prog = 1;
+        const ease = prog < .5 ? 2 * prog * prog : -1 + (4 - 2 * prog) * prog;
+        
+        packet.setAttribute('cx', 400 + (target.x - 400) * ease);
+        packet.setAttribute('cy', startY + (target.y - startY) * ease);
+
+        if (prog < 1) {
+          requestAnimationFrame(anim);
+        } else {
+          packet.remove();
+          completed++;
+          if (completed === indices.length) resolve(linksG);
+        }
+      }
+      requestAnimationFrame(anim);
+    });
+  });
+}
+
+function highlightCell(index, color, duration=500) {
+  const rect = document.getElementById(`bit-${index}`);
+  const origFill = rect.style.fill;
+  const origStroke = rect.style.stroke;
+  
+  rect.style.fill = color;
+  rect.style.stroke = color;
+  
+  setTimeout(() => {
+    rect.style.fill = origFill;
+    rect.style.stroke = origStroke;
+    updateGridUI(); // reset to proper classes
+  }, duration);
+}
+
+// ============================================================
+// LOGIC
+// ============================================================
+function updateMetrics() {
+  const n = state.items.size;
+  const bitsSet = updateGridUI();
+  
+  statN.textContent = n;
+  statBits.textContent = `${Math.round((bitsSet / m) * 100)}%`;
+
+  // Probability P = (1 - e^(-k * n / m))^k
+  let p = 0;
+  if (n > 0) {
+    const exp = Math.exp(-(state.k * n) / m);
+    p = Math.pow(1 - exp, state.k);
+  }
+  
+  const pct = (p * 100).toFixed(2);
+  statP.textContent = `${pct}%`;
+  
+  if (p > 0.5) statP.className = 'stat-val val-warn';
+  else statP.className = 'stat-val';
+}
+
+function lockUI(lock) {
+  state.isAnimating = lock;
+  btnAdd.disabled = lock; btnChk.disabled = lock; 
+  btnRand.disabled = lock; btnClear.disabled = lock; sliderK.disabled = lock;
+}
+
+async function doAdd(str) {
+  if (!str) return;
+  if (state.isAnimating) return;
+  lockUI(true);
+  
+  nodesG.innerHTML = ''; linksG.innerHTML = '';
+  const node = drawInputNode(`Add: "${str}"`, 80);
+  
+  const indices = getHashes(str, state.k, m);
+  const colors = HASH_COLORS.slice(0, state.k);
+
+  narration.innerHTML = `Adding <strong>"${str}"</strong>...<br/>Hashing string ${state.k} times. Mapping to indices: [${indices.join(', ')}].`;
+  
+  await sendHashPackets(100, indices, colors, 600);
+  
+  // Set bits
+  indices.forEach((idx, i) => {
+    state.bits[idx] = 1;
+    highlightCell(idx, colors[i]);
+  });
+  
+  state.items.add(str);
+  updateMetrics();
+  
+  narration.innerHTML += `<br/><br/>Bits set to 1. Item inserted.`;
+  setTimeout(() => { lockUI(false); inputTxt.value = ''; }, 600);
+}
+
+async function doCheck(str) {
+  if (!str) return;
+  if (state.isAnimating) return;
+  lockUI(true);
+  
+  nodesG.innerHTML = ''; linksG.innerHTML = '';
+  drawInputNode(`Check: "${str}"`, 80);
+  
+  const indices = getHashes(str, state.k, m);
+  const colors = HASH_COLORS.slice(0, state.k);
+
+  narration.innerHTML = `Checking <strong>"${str}"</strong>...<br/>Looking up indices: [${indices.join(', ')}].`;
+  
+  await sendHashPackets(100, indices, colors, 600);
+  
+  let allOnes = true;
+  indices.forEach((idx, i) => {
+    highlightCell(idx, colors[i], 1000);
+    if (state.bits[idx] === 0) allOnes = false;
+  });
+  
+  const actuallyPresent = state.items.has(str);
+
+  if (!allOnes) {
+    narration.innerHTML += `<br/><br/><strong style="color:var(--succ)">DEFINITELY NOT PRESENT.</strong><br/>At least one mapped bit was 0.`;
+  } else {
+    if (actuallyPresent) {
+      narration.innerHTML += `<br/><br/><strong style="color:var(--ink)">PROBABLY PRESENT.</strong><br/>All bits were 1. (In reality, it IS in our set).`;
+    } else {
+      narration.innerHTML += `<br/><br/><strong style="color:var(--stale)">FALSE POSITIVE DETECTED!</strong><br/>All bits were 1, but we never inserted this word! The bits were flipped to 1 by collisions from *other* words.`;
+    }
+  }
+
+  setTimeout(() => { lockUI(false); }, 1000);
+}
+
+// ============================================================
+// LISTENERS & INIT
+// ============================================================
+sliderK.addEventListener('input', (e) => {
+  state.k = parseInt(e.target.value, 10);
+  valK.textContent = state.k;
+  // If we change K, the existing filter is invalid. Force clear.
+  btnClear.click();
+  narration.innerHTML = `Changed hash functions to ${state.k}. Filter reset.`;
+});
+
+btnAdd.addEventListener('click', () => doAdd(inputTxt.value.trim()));
+btnChk.addEventListener('click', () => doCheck(inputTxt.value.trim()));
+
+// Enter key support
+inputTxt.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') doAdd(inputTxt.value.trim());
+});
+
+btnRand.addEventListener('click', () => {
+  const words = ['apple', 'banana', 'server', 'cache', 'proxy', 'node', 'queue', 'dns', 'shard', 'kafka', 'redis', 'sql', 'tcp', 'udp', 'token', 'bucket', 'hash', 'ring', 'paxos', 'raft'];
+  const w = words[Math.floor(Math.random() * words.length)] + Math.floor(Math.random()*100);
+  inputTxt.value = w;
+  doAdd(w);
+});
+
+btnClear.addEventListener('click', () => {
+  state.bits.fill(0);
+  state.items.clear();
+  nodesG.innerHTML = ''; linksG.innerHTML = '';
+  updateMetrics();
+  narration.innerHTML = "Filter cleared.";
+});
+
+// Start
+initGrid();
+updateMetrics();
+
+</script>
+</body>
+</html>

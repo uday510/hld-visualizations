@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CAP Theorem — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic feedback colors */
+    --err: #ff4a4a;   /* Red for errors/partitions */
+    --succ: #50e3c2;  /* Mint for success */
+    --stale: #ff7849; /* Orange for stale data */
+    --purple: #c084fc;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO & BREADCRUMB
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* ============================================================
+     LAYOUT & PANELS
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 500px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .panel h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    margin-bottom: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  
+  button, select {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 20px;
+    border-radius: 50px; 
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    appearance: none;
+  }
+  
+  select {
+    width: 100%;
+    margin-bottom: 24px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px top 50%;
+    background-size: 10px auto;
+  }
+  
+  button:hover, select:hover { border-color: var(--ink); }
+  
+  button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button.primary:hover { opacity: 0.8; }
+  
+  button.danger { border-color: var(--line); color: var(--err); }
+  button.danger:hover { background: rgba(255, 74, 74, 0.1); border-color: var(--err); }
+  
+  button.action-write { border-color: var(--line); width: 100%; margin-bottom: 8px;}
+  button.action-read { border-color: var(--line); width: 100%; margin-bottom: 8px;}
+  button.action-write:hover { border-color: var(--ink); }
+  button.action-read:hover { border-color: var(--ink); }
+
+  .control-group {
+    padding-top: 20px;
+    border-top: 1px dashed var(--line);
+  }
+  .control-group label {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  
+  /* ============================================================
+     NARRATION & LOG
+     ============================================================ */
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 120px;
+  }
+  .narration strong { color: var(--ink); }
+  .log-succ { color: var(--succ); }
+  .log-err { color: var(--err); }
+  .log-warn { color: var(--stale); }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: all 0.3s; }
+  .node-active { stroke: var(--ink); }
+  .link-healthy { stroke: var(--ink); stroke-width: 3; stroke-dasharray: none; }
+  .link-broken { stroke: var(--err); stroke-width: 3; stroke-dasharray: 6 6; opacity: 0.5; }
+  .packet { fill: var(--ink); }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+  
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>CAP <span>Theorem</span></h1>
+    <div class="subtitle">simulate partitions · toggle consistency models · trace stale data</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">DISTRIBUTED DATA SYSTEM</div>
+      <svg id="cap-svg" viewBox="0 0 800 500">
+        <g id="network-link"></g>
+        
+        <g id="nodes-layer"></g>
+        
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+        
+        <text x="150" y="380" text-anchor="middle" fill="#777" font-size="12" font-family="JetBrains Mono">CLIENT WRITES HERE</text>
+        <text x="650" y="380" text-anchor="middle" fill="#777" font-size="12" font-family="JetBrains Mono">CLIENT READS HERE</text>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>System Config</h2>
+        <select id="mode-select">
+          <option value="CP">CP Mode (Consistency over Availability)</option>
+          <option value="AP">AP Mode (Availability over Consistency)</option>
+        </select>
+
+        <div class="btn-row">
+          <button id="toggle-network" class="danger">Sever Network (Partition)</button>
+        </div>
+
+        <div class="control-group">
+          <label>Simulate Client Requests</label>
+          <button id="btn-write" class="action-write">1. Write new data to Node A</button>
+          <button id="btn-read" class="action-read">2. Read data from Node B</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>What just happened?</h2>
+        <div class="narration" id="narration">
+          <strong>System Healthy:</strong> Network is intact. In CP mode, the system guarantees Consistency. In AP mode, it guarantees Availability. Both work perfectly when the network is up.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const state = {
+  mode: 'CP', // 'CP' or 'AP'
+  partitioned: false,
+  nodeA: { val: 'V1', pending: null },
+  nodeB: { val: 'V1' },
+  writeCount: 1,
+  animating: false
+};
+
+const GEO = {
+  nodeA: { x: 150, y: 250 },
+  nodeB: { x: 650, y: 250 },
+  radius: 45
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linkG = document.getElementById('network-link');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+const narrationDiv = document.getElementById('narration');
+
+const btnToggleNet = document.getElementById('toggle-network');
+const btnWrite = document.getElementById('btn-write');
+const btnRead = document.getElementById('btn-read');
+const modeSelect = document.getElementById('mode-select');
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderStatic() {
+  // 1. Draw Network Link
+  linkG.innerHTML = '';
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', GEO.nodeA.x + GEO.radius);
+  line.setAttribute('y1', GEO.nodeA.y);
+  line.setAttribute('x2', GEO.nodeB.x - GEO.radius);
+  line.setAttribute('y2', GEO.nodeB.y);
+  line.setAttribute('class', state.partitioned ? 'link-broken' : 'link-healthy');
+  linkG.appendChild(line);
+
+  if (state.partitioned) {
+    const xIcon = document.createElementNS(svgNS, 'text');
+    xIcon.setAttribute('x', 400);
+    xIcon.setAttribute('y', 260);
+    xIcon.setAttribute('text-anchor', 'middle');
+    xIcon.setAttribute('fill', 'var(--err)');
+    xIcon.setAttribute('font-size', '32');
+    xIcon.setAttribute('font-weight', 'bold');
+    xIcon.textContent = '✕';
+    linkG.appendChild(xIcon);
+  }
+
+  // 2. Draw Nodes
+  nodesG.innerHTML = '';
+  drawNode(GEO.nodeA.x, GEO.nodeA.y, 'Node A (Primary)', state.nodeA.val, '#c084fc');
+  drawNode(GEO.nodeB.x, GEO.nodeB.y, 'Node B (Replica)', state.nodeB.val, '#4ad6ff');
+}
+
+function drawNode(x, y, title, value, accentColor) {
+  // DB Cylinder Shape Representation
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('x', x - GEO.radius);
+  rect.setAttribute('y', y - GEO.radius);
+  rect.setAttribute('width', GEO.radius * 2);
+  rect.setAttribute('height', GEO.radius * 2);
+  rect.setAttribute('rx', 12);
+  rect.setAttribute('class', 'node-bg node-active');
+  rect.style.stroke = accentColor;
+  nodesG.appendChild(rect);
+
+  const titleText = document.createElementNS(svgNS, 'text');
+  titleText.setAttribute('x', x);
+  titleText.setAttribute('y', y - GEO.radius - 16);
+  titleText.setAttribute('text-anchor', 'middle');
+  titleText.setAttribute('fill', '#fff');
+  titleText.setAttribute('font-family', 'JetBrains Mono');
+  titleText.setAttribute('font-size', '14');
+  titleText.setAttribute('font-weight', 'bold');
+  titleText.textContent = title;
+  nodesG.appendChild(titleText);
+
+  const valText = document.createElementNS(svgNS, 'text');
+  valText.setAttribute('x', x);
+  valText.setAttribute('y', y + 8);
+  valText.setAttribute('text-anchor', 'middle');
+  valText.setAttribute('fill', '#fff');
+  valText.setAttribute('font-family', 'JetBrains Mono');
+  valText.setAttribute('font-size', '24');
+  valText.setAttribute('font-weight', 'bold');
+  valText.textContent = value;
+  nodesG.appendChild(valText);
+}
+
+function pulseAt(x, y, color) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', x);
+  ring.setAttribute('cy', y);
+  ring.setAttribute('r', GEO.radius);
+  ring.setAttribute('stroke', color);
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  
+  let frame = 0;
+  function anim() {
+    frame++;
+    const r = GEO.radius + (frame * 2);
+    const op = 1 - (frame / 20);
+    if(op <= 0) { ring.remove(); return; }
+    ring.setAttribute('r', r);
+    ring.style.opacity = op;
+    requestAnimationFrame(anim);
+  }
+  requestAnimationFrame(anim);
+}
+
+function animatePacket(startX, endX, y, color, hitsWall, onComplete) {
+  state.animating = true;
+  const packet = document.createElementNS(svgNS, 'circle');
+  packet.setAttribute('cy', y);
+  packet.setAttribute('r', 6);
+  packet.setAttribute('fill', color);
+  packetsG.appendChild(packet);
+
+  let progress = 0;
+  const targetX = hitsWall ? 400 : endX; // 400 is the middle/partition
+
+  function anim() {
+    progress += 0.03;
+    if (progress >= 1) {
+      packet.remove();
+      state.animating = false;
+      if (hitsWall) {
+        pulseAt(400, y, 'var(--err)'); // Explosion at partition
+      }
+      if (onComplete) onComplete();
+      return;
+    }
+    const currentX = startX + (targetX - startX) * progress;
+    packet.setAttribute('cx', currentX);
+    requestAnimationFrame(anim);
+  }
+  requestAnimationFrame(anim);
+}
+
+// ============================================================
+// LOGIC & ACTIONS
+// ============================================================
+
+function toggleNetwork() {
+  state.partitioned = !state.partitioned;
+  btnToggleNet.textContent = state.partitioned ? 'Restore Network' : 'Sever Network (Partition)';
+  btnToggleNet.style.borderColor = state.partitioned ? 'var(--succ)' : 'var(--line)';
+  btnToggleNet.style.color = state.partitioned ? 'var(--succ)' : 'var(--err)';
+  
+  if (state.partitioned) {
+    narrationDiv.innerHTML = `<span class="log-err"><strong>NETWORK PARTITIONED!</strong></span> Nodes A and B can no longer communicate. The system must now choose between Consistency or Availability.`;
+  } else {
+    // Heal system
+    if (state.nodeA.val !== state.nodeB.val) {
+      state.nodeB.val = state.nodeA.val;
+      narrationDiv.innerHTML = `<span class="log-succ"><strong>NETWORK RESTORED.</strong></span> Partition healed. Node B synced with Node A. System is consistent again.`;
+    } else {
+      narrationDiv.innerHTML = `<span class="log-succ"><strong>NETWORK RESTORED.</strong></span> Nodes can communicate again.`;
+    }
+  }
+  renderStatic();
+}
+
+function executeWrite() {
+  if (state.animating) return;
+  state.writeCount++;
+  const newVal = 'V' + state.writeCount;
+  
+  if (state.partitioned) {
+    if (state.mode === 'CP') {
+      // CP Mode blocks writes during partition
+      pulseAt(GEO.nodeA.x, GEO.nodeA.y, 'var(--err)');
+      narrationDiv.innerHTML = `<strong>Write to A:</strong> <span class="log-err">FAILED.</span><br/><br/><strong>Why?</strong> You are in CP mode. Node A cannot reach Node B to guarantee the data is replicated. To maintain strict Consistency, the system refuses the write.`;
+      state.writeCount--; // Rollback counter
+    } else {
+      // AP Mode accepts writes during partition
+      state.nodeA.val = newVal;
+      renderStatic();
+      pulseAt(GEO.nodeA.x, GEO.nodeA.y, 'var(--succ)');
+      
+      animatePacket(GEO.nodeA.x + GEO.radius, GEO.nodeB.x - GEO.radius, GEO.nodeA.y, '#ffffff', true, () => {
+        narrationDiv.innerHTML = `<strong>Write to A:</strong> <span class="log-succ">SUCCESS.</span><br/><br/><strong>Why?</strong> You are in AP mode. Node A accepts the write to remain Available, even though replication to Node B failed. <br/><br/><span class="log-warn">Warning: System is now INCONSISTENT.</span>`;
+      });
+    }
+  } else {
+    // Healthy Write
+    state.nodeA.val = newVal;
+    renderStatic();
+    pulseAt(GEO.nodeA.x, GEO.nodeA.y, 'var(--succ)');
+    
+    animatePacket(GEO.nodeA.x + GEO.radius, GEO.nodeB.x - GEO.radius, GEO.nodeA.y, '#ffffff', false, () => {
+      state.nodeB.val = newVal;
+      renderStatic();
+      pulseAt(GEO.nodeB.x, GEO.nodeB.y, 'var(--succ)');
+      narrationDiv.innerHTML = `<strong>Write to A:</strong> <span class="log-succ">SUCCESS.</span><br/><br/>Data successfully replicated to Node B. System is consistent.`;
+    });
+  }
+}
+
+function executeRead() {
+  if (state.animating) return;
+
+  if (state.partitioned) {
+    if (state.mode === 'CP') {
+      // CP Mode blocks reads during partition to prevent stale data
+      pulseAt(GEO.nodeB.x, GEO.nodeB.y, 'var(--err)');
+      narrationDiv.innerHTML = `<strong>Read from B:</strong> <span class="log-err">ERROR.</span><br/><br/><strong>Why?</strong> You are in CP mode. Node B knows the network is broken and it might not have the latest data. To prevent returning stale data (violating Consistency), it returns an error.`;
+    } else {
+      // AP Mode allows stale reads
+      pulseAt(GEO.nodeB.x, GEO.nodeB.y, 'var(--stale)');
+      const isStale = state.nodeA.val !== state.nodeB.val;
+      const statusText = isStale ? `<span class="log-warn">STALE DATA (${state.nodeB.val})</span>` : `<span class="log-succ">SUCCESS (${state.nodeB.val})</span>`;
+      
+      narrationDiv.innerHTML = `<strong>Read from B:</strong> ${statusText}.<br/><br/><strong>Why?</strong> You are in AP mode. Node B prioritizes Availability and returns whatever data it has locally, even if it is outdated compared to Node A.`;
+    }
+  } else {
+    // Healthy Read
+    pulseAt(GEO.nodeB.x, GEO.nodeB.y, 'var(--succ)');
+    narrationDiv.innerHTML = `<strong>Read from B:</strong> <span class="log-succ">SUCCESS (${state.nodeB.val}).</span><br/><br/>Network is healthy, data is guaranteed up to date.`;
+  }
+}
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+btnToggleNet.addEventListener('click', toggleNetwork);
+btnWrite.addEventListener('click', executeWrite);
+btnRead.addEventListener('click', executeRead);
+
+modeSelect.addEventListener('change', (e) => {
+  state.mode = e.target.value;
+  narrationDiv.innerHTML = `Switched to <strong>${state.mode} Mode</strong>. <br/><br/>Try severing the network, then performing a Read or Write to see how the system handles the partition.`;
+});
+
+// Init
+renderStatic();
+</script>
+</body>
+</html>

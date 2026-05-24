@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Caching Strategies — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic Colors */
+    --cache: #ff5d8f; /* Pink for Redis/Cache */
+    --db: #4ad6ff;    /* Cyan for DB */
+    --app: #d4ff3a;   /* Lime for App */
+    --succ: #50e3c2;  /* Mint */
+    --warn: #ff4a4a;  
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle { font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 650px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .input-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  
+  button, select, input[type="text"] {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 16px;
+    border-radius: 8px; 
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+  }
+  
+  select {
+    width: 100%; margin-bottom: 24px; border-radius: 50px; appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat; background-position: right 16px top 50%; background-size: 10px auto;
+  }
+  
+  input[type="text"] { width: 100%; border-radius: 8px; color: var(--ink); text-transform: none; }
+  
+  button { cursor: pointer; border-radius: 50px; flex: 1;}
+  button:hover, select:hover, input[type="text"]:focus { border-color: var(--ink); }
+  
+  button.action-read { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button.action-read:hover { opacity: 0.8; }
+  button.action-write { background: transparent; color: var(--ink); border-color: var(--line); }
+  button.action-write:hover { border-color: var(--ink); }
+  
+  button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  /* ============================================================
+     STATS, STATE & NARRATION
+     ============================================================ */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .stat-box { border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+  .cache-mem { margin-top: 16px; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .cache-mem-title { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 8px; text-transform: uppercase;}
+  .cache-slots { display: flex; gap: 8px; }
+  .slot { flex: 1; height: 32px; border: 1px dashed var(--line); border-radius: 4px; display: flex; justify-content: center; align-items: center; font-size: 12px; font-family: 'JetBrains Mono'; color: var(--muted); transition: all 0.3s; }
+  .slot.filled { border-style: solid; border-color: var(--cache); color: var(--ink); background: rgba(255, 93, 143, 0.1); }
+  .slot.dirty { border-color: var(--warn); color: var(--warn); }
+
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 120px;
+    margin-top: 16px;
+  }
+  .narration strong { color: var(--ink); }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: stroke 0.3s; }
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Caching <span>Strategies</span></h1>
+    <div class="subtitle">cache-aside · write-through · write-back · simulate evictions</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">SYSTEM TOPOLOGY</div>
+      <svg id="system-svg" viewBox="0 0 800 600">
+        <g id="links-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+      </svg>
+      
+      <div style="display:flex; justify-content: space-between; padding: 0 40px;">
+        <div class="cache-mem" style="flex: 1; margin-right: 120px;">
+          <div class="cache-mem-title">Cache Memory (Max 3, LRU) <span id="evict-warn" style="color:var(--warn); display:none;">(EVICTION!)</span></div>
+          <div class="cache-slots" id="cache-ui">
+            <div class="slot">empty</div><div class="slot">empty</div><div class="slot">empty</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Configuration</h2>
+        <select id="strategy-select">
+          <option value="aside">Cache-Aside (Lazy Loading)</option>
+          <option value="through">Write-Through</option>
+          <option value="back">Write-Back (Write-Behind)</option>
+          <option value="around">Write-Around</option>
+        </select>
+
+        <div class="input-row">
+          <input type="text" id="input-key" placeholder="Key (e.g. user_1)" value="user_1" />
+          <input type="text" id="input-val" placeholder="Value (e.g. bob)" value="bob" />
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-read" class="action-read">Read Data</button>
+          <button id="btn-write" class="action-write">Write Data</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Metrics & Logs</h2>
+        <div class="stats-grid">
+          <div class="stat-box"><div class="stat-label">Cache Hits</div><div class="stat-val" id="stat-hits" style="color:var(--succ)">0</div></div>
+          <div class="stat-box"><div class="stat-label">Cache Misses</div><div class="stat-val" id="stat-misses" style="color:var(--warn)">0</div></div>
+          <div class="stat-box"><div class="stat-label">DB Reads</div><div class="stat-val" id="stat-dbr">0</div></div>
+          <div class="stat-box"><div class="stat-label">DB Writes</div><div class="stat-val" id="stat-dbw">0</div></div>
+        </div>
+
+        <div class="narration" id="narration">
+          Select a strategy and perform a <strong>Read</strong> or <strong>Write</strong>. Watch how data flows between the App Server, Cache, and Database.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const GEO = {
+  client: { x: 100, y: 300, label: 'Client' },
+  app:    { x: 350, y: 300, label: 'App Server', color: 'var(--app)' },
+  cache:  { x: 650, y: 150, label: 'Redis Cache', color: 'var(--cache)' },
+  db:     { x: 650, y: 450, label: 'Database', color: 'var(--db)' }
+};
+
+const state = {
+  strategy: 'aside',
+  isAnimating: false,
+  cache: [], // max 3 items: { key, val, dirty }
+  db: { 'user_1': 'alice', 'user_2': 'charlie' }, // Seed DB
+  stats: { hits: 0, misses: 0, dbr: 0, dbw: 0 }
+};
+const CACHE_MAX = 3;
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+const cacheUI = document.getElementById('cache-ui');
+
+const btnRead = document.getElementById('btn-read');
+const btnWrite = document.getElementById('btn-write');
+const inputKey = document.getElementById('input-key');
+const inputVal = document.getElementById('input-val');
+const selStrategy = document.getElementById('strategy-select');
+const narration = document.getElementById('narration');
+
+// ============================================================
+// SVG RENDERING
+// ============================================================
+function renderStatic() {
+  linksG.innerHTML = ''; nodesG.innerHTML = '';
+  
+  // Links
+  drawLine(GEO.client, GEO.app);
+  drawLine(GEO.app, GEO.cache);
+  drawLine(GEO.app, GEO.db);
+
+  // Nodes
+  drawRectNode(GEO.client, false);
+  drawRectNode(GEO.app, true);
+  drawCylinderNode(GEO.cache);
+  drawCylinderNode(GEO.db);
+}
+
+function drawLine(p1, p2) {
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('class', 'link-line');
+  linksG.appendChild(line);
+}
+
+function drawRectNode(node, isApp) {
+  const w = 90, h = 60;
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', node.x - w/2); c.setAttribute('y', node.y - h/2);
+  c.setAttribute('width', w); c.setAttribute('height', h);
+  c.setAttribute('rx', 8); c.setAttribute('class', 'node-bg');
+  if(node.color) c.style.stroke = node.color;
+  nodesG.appendChild(c);
+  addLabel(node);
+}
+
+function drawCylinderNode(node) {
+  const r = 45;
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', node.x - r); c.setAttribute('y', node.y - r);
+  c.setAttribute('width', r*2); c.setAttribute('height', r*2);
+  c.setAttribute('rx', 12); c.setAttribute('class', 'node-bg');
+  c.style.stroke = node.color;
+  nodesG.appendChild(c);
+  addLabel(node);
+}
+
+function addLabel(node) {
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', node.x); t.setAttribute('y', node.y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', node.color || '#fff');
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '12'); t.setAttribute('font-weight', 'bold');
+  t.textContent = node.label;
+  nodesG.appendChild(t);
+}
+
+// ============================================================
+// ANIMATION SYSTEM (Async/Await)
+// ============================================================
+function pulseNode(node) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', node.x); ring.setAttribute('cy', node.y);
+  ring.setAttribute('r', 50); ring.setAttribute('stroke', node.color || '#fff');
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  
+  let f = 0;
+  function anim() {
+    f++;
+    ring.setAttribute('r', 50 + (f*2)); ring.style.opacity = 1 - (f/20);
+    if(f < 20) requestAnimationFrame(anim); else ring.remove();
+  }
+  requestAnimationFrame(anim);
+}
+
+function sendPacket(start, end, color, text = '', duration = 500) {
+  return new Promise(resolve => {
+    const packetG = document.createElementNS(svgNS, 'g');
+    
+    const p = document.createElementNS(svgNS, 'circle');
+    p.setAttribute('r', 6); p.setAttribute('fill', color);
+    packetG.appendChild(p);
+
+    if (text) {
+      const lbl = document.createElementNS(svgNS, 'text');
+      lbl.setAttribute('y', -12); lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('fill', '#fff'); lbl.setAttribute('font-size', '10');
+      lbl.setAttribute('font-family', 'JetBrains Mono');
+      lbl.textContent = text;
+      packetG.appendChild(lbl);
+    }
+    
+    packetsG.appendChild(packetG);
+    const sTime = performance.now();
+
+    function anim(time) {
+      let prog = (time - sTime) / duration;
+      if (prog > 1) prog = 1;
+      const ease = prog < .5 ? 2 * prog * prog : -1 + (4 - 2 * prog) * prog;
+      const x = start.x + (end.x - start.x) * ease;
+      const y = start.y + (end.y - start.y) * ease;
+      packetG.setAttribute('transform', `translate(${x},${y})`);
+
+      if (prog < 1) requestAnimationFrame(anim);
+      else { packetG.remove(); resolve(); }
+    }
+    requestAnimationFrame(anim);
+  });
+}
+
+// ============================================================
+// CACHE LOGIC & UI
+// ============================================================
+function updateStats() {
+  document.getElementById('stat-hits').textContent = state.stats.hits;
+  document.getElementById('stat-misses').textContent = state.stats.misses;
+  document.getElementById('stat-dbr').textContent = state.stats.dbr;
+  document.getElementById('stat-dbw').textContent = state.stats.dbw;
+}
+
+function renderCacheUI() {
+  cacheUI.innerHTML = '';
+  for(let i=0; i<CACHE_MAX; i++) {
+    const d = document.createElement('div');
+    if (state.cache[i]) {
+      d.className = `slot filled ${state.cache[i].dirty ? 'dirty' : ''}`;
+      d.textContent = `${state.cache[i].key}:${state.cache[i].val}`;
+    } else {
+      d.className = 'slot'; d.textContent = 'empty';
+    }
+    cacheUI.appendChild(d);
+  }
+}
+
+async function evictAndWriteBackIfNeeded() {
+  if (state.cache.length >= CACHE_MAX) {
+    document.getElementById('evict-warn').style.display = 'inline';
+    const evicted = state.cache.shift(); // LRU remove oldest
+    if (evicted.dirty) {
+      narration.innerHTML += `<br/><br/><span style="color:var(--warn)">Eviction triggered!</span> Writing dirty key [${evicted.key}] to DB before dropping.`;
+      await sendPacket(GEO.cache, GEO.db, 'var(--warn)', 'write-back');
+      pulseNode(GEO.db);
+      state.db[evicted.key] = evicted.val;
+      state.stats.dbw++; updateStats();
+    }
+    setTimeout(() => document.getElementById('evict-warn').style.display = 'none', 1000);
+  }
+}
+
+function readCache(key) {
+  const idx = state.cache.findIndex(c => c.key === key);
+  if (idx > -1) {
+    const item = state.cache.splice(idx, 1)[0]; // Pull out
+    state.cache.push(item); // Push to end (Most Recently Used)
+    renderCacheUI();
+    return item.val;
+  }
+  return null;
+}
+
+async function writeCache(key, val, dirty = false) {
+  const idx = state.cache.findIndex(c => c.key === key);
+  if (idx > -1) {
+    state.cache.splice(idx, 1); // Remove old
+  } else {
+    await evictAndWriteBackIfNeeded();
+  }
+  state.cache.push({ key, val, dirty });
+  renderCacheUI();
+}
+
+function invalidateCache(key) {
+  state.cache = state.cache.filter(c => c.key !== key);
+  renderCacheUI();
+}
+
+// ============================================================
+// STRATEGY EXECUTORS
+// ============================================================
+function lockUI(lock) {
+  state.isAnimating = lock;
+  btnRead.disabled = lock; btnWrite.disabled = lock;
+  inputKey.disabled = lock; inputVal.disabled = lock; selStrategy.disabled = lock;
+}
+
+async function doRead() {
+  if(state.isAnimating) return;
+  lockUI(true);
+  const k = inputKey.value;
+  
+  await sendPacket(GEO.client, GEO.app, '#fff', `Read ${k}`);
+  pulseNode(GEO.app);
+
+  if (state.strategy === 'aside') {
+    // 1. Check Cache
+    narration.innerHTML = `<strong>Cache-Aside Read:</strong> Checking Cache for [${k}]...`;
+    await sendPacket(GEO.app, GEO.cache, '#fff', 'chk');
+    pulseNode(GEO.cache);
+    const cVal = readCache(k);
+
+    if (cVal) {
+      // HIT
+      state.stats.hits++; updateStats();
+      narration.innerHTML = `<strong>CACHE HIT!</strong> Found [${k}:${cVal}]. Returning immediately.`;
+      await sendPacket(GEO.cache, GEO.app, 'var(--succ)', cVal);
+      pulseNode(GEO.app);
+    } else {
+      // MISS
+      state.stats.misses++; updateStats();
+      narration.innerHTML = `<strong>CACHE MISS!</strong> Key [${k}] not in cache. Fetching from Database...`;
+      await sendPacket(GEO.cache, GEO.app, 'var(--warn)', 'miss');
+      
+      await sendPacket(GEO.app, GEO.db, '#fff', 'query');
+      pulseNode(GEO.db);
+      state.stats.dbr++; updateStats();
+      const dbVal = state.db[k] || 'null';
+      
+      await sendPacket(GEO.db, GEO.app, 'var(--db)', dbVal);
+      pulseNode(GEO.app);
+      
+      narration.innerHTML += `<br/>DB returned [${dbVal}]. Updating Cache...`;
+      await sendPacket(GEO.app, GEO.cache, 'var(--cache)', 'set');
+      pulseNode(GEO.cache);
+      await writeCache(k, dbVal);
+    }
+  } 
+  // Read for Through/Back/Around is fundamentally the same (miss triggers fetch), 
+  // but let's keep it simple and behave like Cache-Aside for reads in this demo.
+  else {
+    narration.innerHTML = `<strong>Read:</strong> Checking Cache for [${k}]...`;
+    await sendPacket(GEO.app, GEO.cache, '#fff');
+    pulseNode(GEO.cache);
+    const cVal = readCache(k);
+    if (cVal) {
+      state.stats.hits++; updateStats();
+      await sendPacket(GEO.cache, GEO.app, 'var(--succ)', cVal);
+      narration.innerHTML = `<strong>CACHE HIT!</strong>`;
+    } else {
+      state.stats.misses++; state.stats.dbr++; updateStats();
+      await sendPacket(GEO.cache, GEO.app, 'var(--warn)', 'miss');
+      await sendPacket(GEO.app, GEO.db, '#fff'); pulseNode(GEO.db);
+      const dbVal = state.db[k] || 'null';
+      await sendPacket(GEO.db, GEO.app, 'var(--db)', dbVal);
+      if(state.strategy !== 'around') {
+        await sendPacket(GEO.app, GEO.cache, 'var(--cache)'); pulseNode(GEO.cache);
+        await writeCache(k, dbVal);
+      }
+      narration.innerHTML = `<strong>CACHE MISS!</strong> Fetched from DB.`;
+    }
+  }
+
+  // Return to client
+  pulseNode(GEO.app);
+  await sendPacket(GEO.app, GEO.client, 'var(--succ)', 'done');
+  lockUI(false);
+}
+
+
+async function doWrite() {
+  if(state.isAnimating) return;
+  lockUI(true);
+  const k = inputKey.value, v = inputVal.value;
+  
+  await sendPacket(GEO.client, GEO.app, '#fff', `Write ${k}:${v}`);
+  pulseNode(GEO.app);
+
+  if (state.strategy === 'aside') {
+    narration.innerHTML = `<strong>Cache-Aside Write:</strong> Writing directly to Database...`;
+    await sendPacket(GEO.app, GEO.db, '#fff', 'write');
+    pulseNode(GEO.db); state.db[k] = v; state.stats.dbw++; updateStats();
+    
+    await sendPacket(GEO.db, GEO.app, 'var(--succ)', 'ack');
+    narration.innerHTML += `<br/>Invalidating cache entry for [${k}] to prevent stale data.`;
+    await sendPacket(GEO.app, GEO.cache, 'var(--warn)', 'del');
+    pulseNode(GEO.cache); invalidateCache(k);
+  } 
+  
+  else if (state.strategy === 'through') {
+    narration.innerHTML = `<strong>Write-Through:</strong> Writing to Cache first...`;
+    await sendPacket(GEO.app, GEO.cache, '#fff', 'write');
+    pulseNode(GEO.cache); await writeCache(k, v);
+    
+    narration.innerHTML += `<br/>Synchronously writing to Database... (Slower for client)`;
+    await sendPacket(GEO.cache, GEO.db, '#fff', 'sync'); // Flow through cache visually
+    pulseNode(GEO.db); state.db[k] = v; state.stats.dbw++; updateStats();
+    await sendPacket(GEO.db, GEO.app, 'var(--succ)', 'ack');
+  }
+
+  else if (state.strategy === 'back') {
+    narration.innerHTML = `<strong>Write-Back:</strong> Writing to Cache only. Fast response to client!`;
+    await sendPacket(GEO.app, GEO.cache, '#fff', 'write');
+    pulseNode(GEO.cache); await writeCache(k, v, true); // Mark Dirty
+    
+    narration.innerHTML += `<br/><span style="color:var(--warn)">Warning: DB is now stale.</span> Will sync later (e.g. on eviction).`;
+  }
+
+  else if (state.strategy === 'around') {
+    narration.innerHTML = `<strong>Write-Around:</strong> Bypassing cache, writing straight to DB...`;
+    await sendPacket(GEO.app, GEO.db, '#fff', 'write');
+    pulseNode(GEO.db); state.db[k] = v; state.stats.dbw++; updateStats();
+    await sendPacket(GEO.db, GEO.app, 'var(--succ)', 'ack');
+  }
+
+  // Return to client
+  pulseNode(GEO.app);
+  await sendPacket(GEO.app, GEO.client, 'var(--succ)', 'done');
+  lockUI(false);
+}
+
+// ============================================================
+// LISTENERS & INIT
+// ============================================================
+btnRead.addEventListener('click', doRead);
+btnWrite.addEventListener('click', doWrite);
+selStrategy.addEventListener('change', (e) => {
+  state.strategy = e.target.value;
+  narration.innerHTML = `Strategy changed. Try doing a Read or Write to see the new data flow.`;
+});
+
+renderStatic();
+renderCacheUI();
+</script>
+</body>
+</html>

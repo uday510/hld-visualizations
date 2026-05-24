@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Saga & Outbox Pattern — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic Colors */
+    --succ: #50e3c2;
+    --warn: #ff4a4a;
+    --stale: #ff7849;
+    
+    /* Service Colors */
+    --order: #d4ff3a;   /* Lime */
+    --pay: #4ad6ff;     /* Cyan */
+    --inv: #ff5d8f;     /* Pink */
+    --broker: #c084fc;  /* Purple */
+    --relay: #ff7849;   /* Orange */
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO & BREADCRUMB
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle { font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ============================================================
+     LAYOUT & PANELS
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 600px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row { display: flex; gap: 10px; margin-bottom: 24px; }
+  
+  button, select {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 20px;
+    border-radius: 50px; 
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    appearance: none;
+  }
+  
+  select {
+    width: 100%; margin-bottom: 24px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat; background-position: right 16px top 50%; background-size: 10px auto;
+  }
+  
+  button:hover, select:hover { border-color: var(--ink); }
+  
+  button.action-run { background: var(--ink); color: var(--bg); border-color: var(--ink); width: 100%; font-size: 13px; padding: 14px;}
+  button.action-run:hover { opacity: 0.8; }
+  
+  button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  /* ============================================================
+     STATS & NARRATION
+     ============================================================ */
+  .status-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+    border: 1px solid var(--line);
+    padding: 16px;
+    border-radius: 8px;
+  }
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .status-val { font-weight: 700; color: var(--muted); }
+  .status-val.pending { color: var(--stale); }
+  .status-val.done { color: var(--succ); }
+  .status-val.fail { color: var(--warn); }
+
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 140px;
+    height: 180px;
+    overflow-y: auto;
+  }
+  .narration strong { color: var(--ink); }
+  .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; color: #000; margin-right: 6px; }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: stroke 0.3s; }
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; opacity: 0.5; }
+  .packet { transition: transform 0.2s linear; }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Saga & <span>Outbox</span></h1>
+    <div class="subtitle">distributed transactions · compensating actions · dual-write mitigation</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">MICROSERVICES TOPOLOGY</div>
+      <svg id="system-svg" viewBox="0 0 800 600">
+        <g id="links-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Configuration</h2>
+        
+        <label style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:8px;">Dual-Write Protection</label>
+        <select id="outbox-select">
+          <option value="on">Outbox Pattern: ON (Reliable)</option>
+          <option value="off">Outbox Pattern: OFF (Risk of Dual-Write Fail)</option>
+        </select>
+
+        <label style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:8px;">Inventory Status</label>
+        <select id="inventory-select">
+          <option value="instock">Item In Stock (Saga Success)</option>
+          <option value="outofstock">Item Out of Stock (Saga Rollback)</option>
+        </select>
+
+        <button id="btn-run" class="action-run">Place Order</button>
+      </div>
+
+      <div class="panel">
+        <h2>Transaction State</h2>
+        <div class="status-grid">
+          <div class="status-row">
+            <span>Order Status:</span>
+            <span class="status-val" id="stat-order">NONE</span>
+          </div>
+          <div class="status-row">
+            <span>Payment Status:</span>
+            <span class="status-val" id="stat-pay">NONE</span>
+          </div>
+          <div class="status-row">
+            <span>Inventory Status:</span>
+            <span class="status-val" id="stat-inv">NONE</span>
+          </div>
+        </div>
+
+        <div class="narration" id="narration">
+          System Idle.<br/><br/>
+          Click <strong>Place Order</strong> to trace a distributed transaction across three independent microservices.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const GEO = {
+  client: { x: 50, y: 100, label: 'Client', color: '#fff' },
+  
+  orderSvc: { x: 250, y: 100, label: 'Order Svc', color: 'var(--order)' },
+  orderDB:  { x: 450, y: 100, label: 'Order DB', color: 'var(--order)', isDB: true },
+  outbox:   { x: 450, y: 140, label: 'Outbox Table', color: 'var(--relay)' },
+  relay:    { x: 600, y: 120, label: 'Relay Worker', color: 'var(--relay)' },
+  
+  broker:   { x: 400, y: 300, label: 'Event Broker (Kafka)', color: 'var(--broker)' },
+  
+  paySvc:   { x: 150, y: 450, label: 'Payment Svc', color: 'var(--pay)' },
+  payDB:    { x: 150, y: 550, label: 'Payment DB', color: 'var(--pay)', isDB: true },
+  
+  invSvc:   { x: 650, y: 450, label: 'Inventory Svc', color: 'var(--inv)' },
+  invDB:    { x: 650, y: 550, label: 'Inventory DB', color: 'var(--inv)', isDB: true }
+};
+
+const state = {
+  outbox: 'on',
+  inventory: 'instock',
+  isAnimating: false,
+  orderId: 100
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+
+const selOutbox = document.getElementById('outbox-select');
+const selInv = document.getElementById('inventory-select');
+const btnRun = document.getElementById('btn-run');
+const narration = document.getElementById('narration');
+
+const statOrder = document.getElementById('stat-order');
+const statPay = document.getElementById('stat-pay');
+const statInv = document.getElementById('stat-inv');
+
+// ============================================================
+// SVG RENDERING
+// ============================================================
+function drawLine(p1, p2, isDashed = false) {
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('class', 'link-line');
+  if(isDashed) line.setAttribute('stroke-dasharray', '4 6');
+  else line.setAttribute('stroke-dasharray', 'none');
+  linksG.appendChild(line);
+}
+
+function drawNode(node) {
+  if (node.isDB) {
+    const r = 35;
+    const c = document.createElementNS(svgNS, 'rect');
+    c.setAttribute('x', node.x - r); c.setAttribute('y', node.y - r);
+    c.setAttribute('width', r*2); c.setAttribute('height', r*2);
+    c.setAttribute('rx', 12); c.setAttribute('class', 'node-bg');
+    c.style.stroke = node.color;
+    nodesG.appendChild(c);
+    
+    // Split for Outbox
+    if (node.label === 'Order DB') {
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', node.x - r); line.setAttribute('y1', node.y + 10);
+      line.setAttribute('x2', node.x + r); line.setAttribute('y2', node.y + 10);
+      line.setAttribute('stroke', 'var(--line)');
+      nodesG.appendChild(line);
+      
+      const ot = document.createElementNS(svgNS, 'text');
+      ot.setAttribute('x', node.x); ot.setAttribute('y', node.y + 26);
+      ot.setAttribute('text-anchor', 'middle'); ot.setAttribute('fill', 'var(--relay)');
+      ot.setAttribute('font-family', 'JetBrains Mono'); ot.setAttribute('font-size', '9');
+      ot.textContent = 'Outbox';
+      nodesG.appendChild(ot);
+    }
+  } else {
+    let w = 110, h = 40;
+    if (node.label === 'Event Broker (Kafka)') { w = 180; h = 60; }
+    
+    const c = document.createElementNS(svgNS, 'rect');
+    c.setAttribute('x', node.x - w/2); c.setAttribute('y', node.y - h/2);
+    c.setAttribute('width', w); c.setAttribute('height', h);
+    c.setAttribute('rx', 8); c.setAttribute('class', 'node-bg');
+    c.style.stroke = node.color;
+    nodesG.appendChild(c);
+  }
+
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', node.x); 
+  t.setAttribute('y', node.isDB ? node.y - 45 : node.y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', node.isDB ? '#888' : node.color);
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '11'); t.setAttribute('font-weight', 'bold');
+  t.textContent = node.label;
+  nodesG.appendChild(t);
+}
+
+function renderTopology() {
+  linksG.innerHTML = ''; nodesG.innerHTML = '';
+  
+  drawLine(GEO.client, GEO.orderSvc);
+  drawLine(GEO.orderSvc, GEO.orderDB);
+  drawLine(GEO.outbox, GEO.relay, true);
+  drawLine(GEO.relay, GEO.broker, true);
+  drawLine(GEO.orderSvc, GEO.broker); // Direct to broker for non-outbox flow
+  
+  drawLine(GEO.broker, GEO.paySvc);
+  drawLine(GEO.paySvc, GEO.payDB);
+  drawLine(GEO.paySvc, GEO.broker); // ACK back
+  
+  drawLine(GEO.broker, GEO.invSvc);
+  drawLine(GEO.invSvc, GEO.invDB);
+  drawLine(GEO.invSvc, GEO.broker); // ACK back
+
+  drawLine(GEO.broker, GEO.orderSvc); // Final ACK to order
+
+  Object.values(GEO).forEach(n => {
+    if(n.label === 'Outbox Table') return; // Handled in OrderDB
+    if(n.label === 'Relay Worker' && state.outbox === 'off') return;
+    drawNode(n);
+  });
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+function pulse(x, y, color) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', x); ring.setAttribute('cy', y);
+  ring.setAttribute('r', 20); ring.setAttribute('stroke', color);
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  let f = 0;
+  function anim() {
+    f++; ring.setAttribute('r', 20 + (f*2)); ring.style.opacity = 1 - (f/20);
+    if(f<20) requestAnimationFrame(anim); else ring.remove();
+  }
+  requestAnimationFrame(anim);
+}
+
+function explode(x, y) {
+  for(let i=0; i<6; i++) {
+    const r = document.createElementNS(svgNS, 'circle');
+    r.setAttribute('cx', x); r.setAttribute('cy', y);
+    r.setAttribute('r', 4); r.setAttribute('fill', 'var(--warn)');
+    effectsG.appendChild(r);
+    let f = 0;
+    const angle = (Math.PI*2/6) * i;
+    function anim() {
+      f++;
+      r.setAttribute('cx', x + Math.cos(angle) * (f*4));
+      r.setAttribute('cy', y + Math.sin(angle) * (f*4));
+      r.style.opacity = 1 - (f/15);
+      if(f<15) requestAnimationFrame(anim); else r.remove();
+    }
+    requestAnimationFrame(anim);
+  }
+}
+
+function sendPacket(start, end, color, text = '', duration = 600) {
+  return new Promise(resolve => {
+    const packetG = document.createElementNS(svgNS, 'g');
+    const p = document.createElementNS(svgNS, 'circle');
+    p.setAttribute('r', 6); p.setAttribute('fill', color);
+    packetG.appendChild(p);
+
+    if (text) {
+      const lbl = document.createElementNS(svgNS, 'text');
+      lbl.setAttribute('y', -12); lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('fill', '#fff'); lbl.setAttribute('font-size', '10');
+      lbl.setAttribute('font-family', 'JetBrains Mono');
+      lbl.textContent = text;
+      packetG.appendChild(lbl);
+    }
+    
+    packetsG.appendChild(packetG);
+    const sTime = performance.now();
+
+    function anim(time) {
+      let prog = (time - sTime) / duration;
+      if (prog > 1) prog = 1;
+      const ease = prog < .5 ? 2 * prog * prog : -1 + (4 - 2 * prog) * prog;
+      const x = start.x + (end.x - start.x) * ease;
+      const y = start.y + (end.y - start.y) * ease;
+      packetG.setAttribute('transform', `translate(${x},${y})`);
+
+      if (prog < 1) requestAnimationFrame(anim);
+      else { packetG.remove(); resolve(); }
+    }
+    requestAnimationFrame(anim);
+  });
+}
+
+function setLog(svc, html) {
+  let color = '#fff';
+  if(svc === 'ORDER') color = 'var(--order)';
+  if(svc === 'PAYMENT') color = 'var(--pay)';
+  if(svc === 'INVENTORY') color = 'var(--inv)';
+  if(svc === 'BROKER') color = 'var(--broker)';
+  if(svc === 'OUTBOX') color = 'var(--relay)';
+  
+  narration.innerHTML = `<span class="tag" style="background:${color}">${svc}</span> ${html}<br/><br/>` + narration.innerHTML;
+}
+
+function setStatus(el, text, stateClass) {
+  el.textContent = text;
+  el.className = `status-val ${stateClass}`;
+}
+
+// ============================================================
+// SEQUENCE RUNNER
+// ============================================================
+async function runSaga() {
+  if (state.isAnimating) return;
+  state.isAnimating = true;
+  btnRun.disabled = true; selOutbox.disabled = true; selInv.disabled = true;
+  
+  state.orderId++;
+  const oid = state.orderId;
+  narration.innerHTML = '';
+  setStatus(statOrder, 'PENDING', 'pending');
+  setStatus(statPay, 'WAITING', '');
+  setStatus(statInv, 'WAITING', '');
+
+  // 1. Client -> Order
+  await sendPacket(GEO.client, GEO.orderSvc, '#fff', `Create #${oid}`);
+  pulse(GEO.orderSvc.x, GEO.orderSvc.y, GEO.orderSvc.color);
+  setLog('ORDER', `Received request. Initiating Saga for Order #${oid}.`);
+
+  // 2. Order DB Write
+  await sendPacket(GEO.orderSvc, GEO.orderDB, GEO.orderSvc.color, 'Insert DB', 400);
+  pulse(GEO.orderDB.x, GEO.orderDB.y, GEO.orderSvc.color);
+
+  // 3. Outbox Flow
+  if (state.outbox === 'on') {
+    setLog('ORDER', `Atomic transaction: Saved Order to DB <strong>AND</strong> inserted "OrderCreated" event into Outbox table.`);
+    
+    await new Promise(r => setTimeout(r, 500)); // Relay polling delay
+    await sendPacket(GEO.outbox, GEO.relay, GEO.relay.color, 'Poll', 400);
+    pulse(GEO.relay.x, GEO.relay.y, GEO.relay.color);
+    setLog('OUTBOX', `Relay picked up event and reliably forwards it to Kafka.`);
+    
+    await sendPacket(GEO.relay, GEO.broker, GEO.relay.color, 'OrderCreated');
+  } 
+  else {
+    setLog('ORDER', `Attempting to save to DB, then send to Kafka (Dual-Write).`);
+    await sendPacket(GEO.orderSvc, GEO.broker, GEO.orderSvc.color, 'OrderCreated');
+    
+    // Simulate catastrophic dual write failure for demonstration
+    pulse(GEO.broker.x, GEO.broker.y, 'var(--warn)');
+    explode(GEO.broker.x, GEO.broker.y);
+    setLog('ORDER', `<span style="color:var(--warn)"><strong>NETWORK FAILURE!</strong></span> The DB write succeeded, but sending to Kafka failed. The system is now permanently inconsistent. The order is stuck in PENDING forever.`);
+    setStatus(statOrder, 'STUCK (INCONSISTENT)', 'fail');
+    
+    state.isAnimating = false;
+    btnRun.disabled = false; selOutbox.disabled = false; selInv.disabled = false;
+    return;
+  }
+
+  pulse(GEO.broker.x, GEO.broker.y, GEO.broker.color);
+
+  // 4. Broker -> Payment
+  setStatus(statPay, 'PROCESSING', 'pending');
+  await sendPacket(GEO.broker, GEO.paySvc, GEO.broker.color, 'ChargeCard');
+  pulse(GEO.paySvc.x, GEO.paySvc.y, GEO.paySvc.color);
+  
+  await sendPacket(GEO.paySvc, GEO.payDB, GEO.paySvc.color, 'Save', 300);
+  pulse(GEO.payDB.x, GEO.payDB.y, GEO.paySvc.color);
+  setLog('PAYMENT', `Successfully charged $50. Publishing "PaymentCompleted" event.`);
+  setStatus(statPay, 'PAID', 'done');
+
+  // 5. Payment -> Broker
+  await sendPacket(GEO.paySvc, GEO.broker, GEO.paySvc.color, 'PayComplete');
+  pulse(GEO.broker.x, GEO.broker.y, GEO.broker.color);
+
+  // 6. Broker -> Inventory
+  setStatus(statInv, 'PROCESSING', 'pending');
+  await sendPacket(GEO.broker, GEO.invSvc, GEO.broker.color, 'ReserveItems');
+  pulse(GEO.invSvc.x, GEO.invSvc.y, GEO.invSvc.color);
+
+  // 7. Inventory Logic
+  if (state.inventory === 'instock') {
+    await sendPacket(GEO.invSvc, GEO.invDB, GEO.invSvc.color, 'Lock', 300);
+    pulse(GEO.invDB.x, GEO.invDB.y, GEO.invSvc.color);
+    setLog('INVENTORY', `Successfully reserved items. Publishing "InventoryReserved" event.`);
+    setStatus(statInv, 'RESERVED', 'done');
+    
+    await sendPacket(GEO.invSvc, GEO.broker, GEO.invSvc.color, 'InvReserved');
+    pulse(GEO.broker.x, GEO.broker.y, GEO.broker.color);
+    
+    // 8. Broker -> Order (Completion)
+    await sendPacket(GEO.broker, GEO.orderSvc, GEO.broker.color, 'CompleteOrder');
+    pulse(GEO.orderSvc.x, GEO.orderSvc.y, GEO.orderSvc.color);
+    setLog('ORDER', `<strong style="color:var(--succ)">SAGA COMPLETE.</strong> Order #${oid} fulfilled.`);
+    setStatus(statOrder, 'FULFILLED', 'done');
+
+  } else {
+    // Inventory Fails -> Rollback Saga
+    pulse(GEO.invDB.x, GEO.invDB.y, 'var(--warn)');
+    explode(GEO.invSvc.x, GEO.invSvc.y);
+    setLog('INVENTORY', `<span style="color:var(--warn)"><strong>OUT OF STOCK!</strong></span> Failed to reserve items. Publishing "InventoryFailed" event to trigger Saga Rollback.`);
+    setStatus(statInv, 'FAILED (OUT OF STOCK)', 'fail');
+    
+    await sendPacket(GEO.invSvc, GEO.broker, 'var(--warn)', 'InvFailed');
+    pulse(GEO.broker.x, GEO.broker.y, GEO.broker.color);
+
+    // 8. Broker -> Payment (COMPENSATING TRANSACTION)
+    setStatus(statPay, 'REFUNDING...', 'pending');
+    await sendPacket(GEO.broker, GEO.paySvc, 'var(--warn)', 'RefundPayment');
+    pulse(GEO.paySvc.x, GEO.paySvc.y, GEO.paySvc.color);
+    
+    await sendPacket(GEO.paySvc, GEO.payDB, GEO.paySvc.color, 'Refund', 300);
+    pulse(GEO.payDB.x, GEO.payDB.y, GEO.paySvc.color);
+    setLog('PAYMENT', `<strong>COMPENSATING ACTION:</strong> Successfully refunded $50 to customer.`);
+    setStatus(statPay, 'REFUNDED', 'warn');
+    
+    await sendPacket(GEO.paySvc, GEO.broker, GEO.paySvc.color, 'Refunded');
+    pulse(GEO.broker.x, GEO.broker.y, GEO.broker.color);
+
+    // 9. Broker -> Order (Cancel)
+    await sendPacket(GEO.broker, GEO.orderSvc, 'var(--warn)', 'CancelOrder');
+    pulse(GEO.orderSvc.x, GEO.orderSvc.y, 'var(--warn)');
+    setLog('ORDER', `<span style="color:var(--warn)"><strong>SAGA ROLLED BACK.</strong></span> Order #${oid} canceled. System is safely back in a consistent state.`);
+    setStatus(statOrder, 'CANCELED', 'fail');
+  }
+
+  state.isAnimating = false;
+  btnRun.disabled = false; selOutbox.disabled = false; selInv.disabled = false;
+}
+
+// ============================================================
+// LISTENERS & INIT
+// ============================================================
+selOutbox.addEventListener('change', (e) => {
+  state.outbox = e.target.value;
+  renderTopology();
+  if (state.outbox === 'off') {
+    narration.innerHTML = `<span style="color:var(--warn)">Warning:</span> Disabling the outbox exposes the system to Dual-Write failures. Click Place Order to simulate a network drop after saving to the DB.`;
+  } else {
+    narration.innerHTML = `Outbox enabled. System is protected from Dual-Write failures.`;
+  }
+});
+
+selInv.addEventListener('change', (e) => {
+  state.inventory = e.target.value;
+  if (state.inventory === 'outofstock') {
+    narration.innerHTML = `Inventory set to Out of Stock. The next Saga will trigger a <strong>Compensating Transaction</strong> (Refund).`;
+  } else {
+    narration.innerHTML = `Inventory stocked. The next Saga will succeed.`;
+  }
+});
+
+btnRun.addEventListener('click', runSaga);
+
+renderTopology();
+</script>
+</body>
+</html>

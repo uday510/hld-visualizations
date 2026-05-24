@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Idempotency & Retries — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic Colors */
+    --client: #ffffff;
+    --api: #c084fc;    /* Purple */
+    --db: #4ad6ff;     /* Cyan */
+    --cache: #d4ff3a;  /* Lime */
+    
+    --succ: #50e3c2;   /* Mint */
+    --warn: #ff4a4a;   /* Red */
+    --stale: #ff7849;  /* Orange */
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO & BREADCRUMB
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle { font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ============================================================
+     LAYOUT & PANELS
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 600px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  
+  button, select {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 16px;
+    border-radius: 50px; 
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+  }
+  
+  select {
+    width: 100%; margin-bottom: 24px; appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat; background-position: right 16px top 50%; background-size: 10px auto;
+  }
+  select:hover, button:hover { border-color: var(--ink); }
+  
+  button.action { background: var(--ink); color: var(--bg); border-color: var(--ink); padding: 14px; font-size: 12px; }
+  button.action:hover { opacity: 0.8; }
+  
+  button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  .control-group {
+    padding-top: 16px;
+    border-top: 1px dashed var(--line);
+  }
+  .control-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .control-group label .val { font-weight: 700; color: var(--warn); }
+  
+  .slider-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  input[type="range"] { flex: 1; accent-color: var(--warn); }
+
+  /* ============================================================
+     STATS & NARRATION
+     ============================================================ */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .stat-box { border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .val-succ { color: var(--succ); }
+  .val-warn { color: var(--warn); }
+  .val-stale { color: var(--stale); }
+
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 140px;
+    height: 160px;
+    overflow-y: auto;
+  }
+  .narration strong { color: var(--ink); }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: all 0.3s; }
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; transition: stroke 0.3s; }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+  .network-zone { fill: rgba(255, 74, 74, 0.05); stroke: var(--warn); stroke-dasharray: 4 4; rx: 8; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Idempotency <span>& Retries</span></h1>
+    <div class="subtitle">network drops · double charges · exponential backoff · idempotency keys</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">PAYMENT TRANSACTION FLOW</div>
+      <svg id="system-svg" viewBox="0 0 800 600">
+        <rect class="network-zone" x="250" y="50" width="300" height="500"></rect>
+        <text x="400" y="530" text-anchor="middle" fill="var(--warn)" font-size="10" font-family="JetBrains Mono" letter-spacing="0.1em">FLAKY NETWORK ZONE</text>
+
+        <g id="links-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Configuration</h2>
+        
+        <label style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:8px;">Idempotency Keys</label>
+        <select id="idem-select">
+          <option value="on">Enabled (Safe against double charges)</option>
+          <option value="off">Disabled (Risk of double charges)</option>
+        </select>
+
+        <label style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:8px;">Client Retry Strategy</label>
+        <select id="retry-select">
+          <option value="exp">Exponential Backoff (1s, 2s, 4s...)</option>
+          <option value="constant">Constant Retry (every 1s)</option>
+          <option value="none">No Retries (Fail immediately)</option>
+        </select>
+
+        <div class="control-group">
+          <label>Packet Drop Rate <span class="val" id="val-drop">40%</span></label>
+          <div class="slider-row"><input type="range" id="slider-drop" min="0" max="80" value="40" step="5" /></div>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-pay" class="action">Charge $50</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>System State</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Client Status</div>
+            <div class="stat-val val-succ" id="stat-client">IDLE</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">User Balance</div>
+            <div class="stat-val" id="stat-bal">$1000</div>
+          </div>
+        </div>
+
+        <div class="narration" id="narration">
+          System ready. <br/><br/>Click <strong>Charge $50</strong> to initiate a payment. Watch the network zone carefully — if a packet drops, the client will time out and retry.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const GEO = {
+  client: { x: 120, y: 300, label: 'Client App', color: 'var(--client)' },
+  api:    { x: 680, y: 300, label: 'Payment API', color: 'var(--api)' },
+  db:     { x: 680, y: 150, label: 'Ledger DB', color: 'var(--db)' },
+  cache:  { x: 680, y: 450, label: 'Idemp Cache', color: 'var(--cache)' }
+};
+
+const state = {
+  idempotency: 'on',
+  retryStrategy: 'exp',
+  dropRate: 0.40,
+  
+  balance: 1000,
+  cacheKeys: new Set(),
+  
+  isAnimating: false,
+  currentKey: null,
+  retryCount: 0,
+  timeoutTimer: null,
+  inFlightObj: null
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+
+const selIdem = document.getElementById('idem-select');
+const selRetry = document.getElementById('retry-select');
+const sliderDrop = document.getElementById('slider-drop');
+const valDrop = document.getElementById('val-drop');
+const btnPay = document.getElementById('btn-pay');
+
+const statClient = document.getElementById('stat-client');
+const statBal = document.getElementById('stat-bal');
+const narration = document.getElementById('narration');
+
+// ============================================================
+// SVG RENDERING
+// ============================================================
+function drawLine(p1, p2, isDashed = false) {
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('class', 'link-line');
+  if(isDashed) line.setAttribute('stroke-dasharray', '4 6');
+  linksG.appendChild(line);
+}
+
+function drawNode(node, isDb = false) {
+  const w = 120, h = 50;
+  
+  const c = document.createElementNS(svgNS, 'rect');
+  if (isDb) {
+    c.setAttribute('x', node.x - 35); c.setAttribute('y', node.y - 35);
+    c.setAttribute('width', 70); c.setAttribute('height', 70);
+    c.setAttribute('rx', 12);
+  } else {
+    c.setAttribute('x', node.x - w/2); c.setAttribute('y', node.y - h/2);
+    c.setAttribute('width', w); c.setAttribute('height', h);
+    c.setAttribute('rx', 8);
+  }
+  
+  c.setAttribute('class', 'node-bg');
+  c.style.stroke = node.color;
+  nodesG.appendChild(c);
+  
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', node.x); 
+  t.setAttribute('y', isDb ? node.y - 45 : node.y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', node.color);
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '11'); t.setAttribute('font-weight', 'bold');
+  t.textContent = node.label;
+  nodesG.appendChild(t);
+}
+
+function renderTopology() {
+  linksG.innerHTML = ''; nodesG.innerHTML = '';
+  drawLine(GEO.client, GEO.api);
+  drawLine(GEO.api, GEO.db, true);
+  drawLine(GEO.api, GEO.cache, true);
+
+  drawNode(GEO.client);
+  drawNode(GEO.api);
+  drawNode(GEO.db, true);
+  drawNode(GEO.cache, true);
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+function pulse(x, y, color) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', x); ring.setAttribute('cy', y);
+  ring.setAttribute('r', 20); ring.setAttribute('stroke', color);
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  let f = 0;
+  function anim() {
+    f++; ring.setAttribute('r', 20 + (f*2)); ring.style.opacity = 1 - (f/20);
+    if(f<20) requestAnimationFrame(anim); else ring.remove();
+  }
+  requestAnimationFrame(anim);
+}
+
+function explode(x, y) {
+  for(let i=0; i<6; i++) {
+    const r = document.createElementNS(svgNS, 'circle');
+    r.setAttribute('cx', x); r.setAttribute('cy', y);
+    r.setAttribute('r', 4); r.setAttribute('fill', 'var(--warn)');
+    effectsG.appendChild(r);
+    let f = 0;
+    const angle = (Math.PI*2/6) * i;
+    function anim() {
+      f++;
+      r.setAttribute('cx', x + Math.cos(angle) * (f*4));
+      r.setAttribute('cy', y + Math.sin(angle) * (f*4));
+      r.style.opacity = 1 - (f/15);
+      if(f<15) requestAnimationFrame(anim); else r.remove();
+    }
+    requestAnimationFrame(anim);
+  }
+}
+
+function sendPacket(start, end, color, duration, labelText) {
+  return new Promise(resolve => {
+    const pG = document.createElementNS(svgNS, 'g');
+    const p = document.createElementNS(svgNS, 'circle');
+    p.setAttribute('r', 6); p.setAttribute('fill', color);
+    pG.appendChild(p);
+
+    if (labelText) {
+      const lbl = document.createElementNS(svgNS, 'text');
+      lbl.setAttribute('y', -12); lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('fill', '#fff'); lbl.setAttribute('font-size', '10');
+      lbl.setAttribute('font-family', 'JetBrains Mono');
+      lbl.textContent = labelText;
+      pG.appendChild(lbl);
+    }
+    packetsG.appendChild(pG);
+
+    const sTime = performance.now();
+    let aborted = false;
+
+    function anim(time) {
+      if (aborted) return;
+      let prog = (time - sTime) / duration;
+      if (prog > 1) prog = 1;
+      
+      const cx = start.x + (end.x - start.x) * prog;
+      const cy = start.y + (end.y - start.y) * prog;
+      pG.setAttribute('transform', `translate(${cx},${cy})`);
+
+      // Network Drop Logic (only in the middle zone)
+      if (prog > 0.4 && prog < 0.6) {
+        if (Math.random() < (state.dropRate * 0.05)) { // scaled down because it runs 60fps
+          aborted = true;
+          pG.remove();
+          explode(cx, cy);
+          resolve('dropped');
+          return;
+        }
+      }
+
+      if (prog < 1) requestAnimationFrame(anim);
+      else { pG.remove(); resolve('arrived'); }
+    }
+    requestAnimationFrame(anim);
+  });
+}
+
+function sendInternal(start, end, color, text) {
+  return new Promise(resolve => {
+    const pG = document.createElementNS(svgNS, 'g');
+    const p = document.createElementNS(svgNS, 'circle');
+    p.setAttribute('r', 4); p.setAttribute('fill', color);
+    pG.appendChild(p);
+    
+    if (text) {
+      const lbl = document.createElementNS(svgNS, 'text');
+      lbl.setAttribute('y', -10); lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('fill', '#fff'); lbl.setAttribute('font-size', '9');
+      lbl.setAttribute('font-family', 'JetBrains Mono');
+      lbl.textContent = text;
+      pG.appendChild(lbl);
+    }
+    packetsG.appendChild(pG);
+    
+    const duration = 300;
+    const sTime = performance.now();
+    function anim(time) {
+      let prog = (time - sTime) / duration;
+      if (prog > 1) prog = 1;
+      const cx = start.x + (end.x - start.x) * prog;
+      const cy = start.y + (end.y - start.y) * prog;
+      pG.setAttribute('transform', `translate(${cx},${cy})`);
+      if (prog < 1) requestAnimationFrame(anim);
+      else { pG.remove(); resolve(); }
+    }
+    requestAnimationFrame(anim);
+  });
+}
+
+// ============================================================
+// LOGIC
+// ============================================================
+function log(msg) {
+  narration.innerHTML = msg + '<br/><br/>' + narration.innerHTML;
+}
+
+function updateBal() {
+  statBal.textContent = `$${state.balance}`;
+}
+
+function setClientStatus(text, colorVar) {
+  statClient.textContent = text;
+  statClient.style.color = colorVar;
+}
+
+async function executePayment() {
+  if (state.isAnimating) return;
+  state.isAnimating = true;
+  btnPay.disabled = true; selIdem.disabled = true; selRetry.disabled = true; sliderDrop.disabled = true;
+
+  // New Transaction setup
+  state.retryCount = 0;
+  state.currentKey = `tx-${Math.floor(Math.random()*10000)}`;
+  
+  await attemptRequest();
+}
+
+async function attemptRequest() {
+  const isRetry = state.retryCount > 0;
+  
+  if (state.idempotency === 'on') {
+    log(`Client sending Request (Key: <strong>${state.currentKey}</strong>)`);
+  } else {
+    // If idempotency is off, client basically generates a new request even on retry
+    state.currentKey = `tx-${Math.floor(Math.random()*10000)}`;
+    log(`Client sending Request (No Key)`);
+  }
+
+  setClientStatus(isRetry ? `RETRYING (${state.retryCount})` : 'SENDING...', 'var(--stale)');
+  pulse(GEO.client.x, GEO.client.y, GEO.client.color);
+
+  // 1. Client -> API
+  const reqResult = await sendPacket(GEO.client, GEO.api, GEO.client.color, 1200, state.idempotency==='on' ? state.currentKey : '');
+  
+  if (reqResult === 'dropped') {
+    handleTimeout("Request lost in network.");
+    return;
+  }
+
+  pulse(GEO.api.x, GEO.api.y, GEO.api.color);
+
+  // 2. Server Processing
+  let shouldCharge = true;
+
+  if (state.idempotency === 'on') {
+    await sendInternal(GEO.api, GEO.cache, GEO.cache.color, 'Check Key');
+    pulse(GEO.cache.x, GEO.cache.y, GEO.cache.color);
+    
+    if (state.cacheKeys.has(state.currentKey)) {
+      log(`<strong style="color:var(--succ)">IDEMPOTENCY HIT!</strong> Server recognizes key ${state.currentKey}. Skipping DB charge, returning cached success.`);
+      shouldCharge = false;
+      await sendInternal(GEO.cache, GEO.api, GEO.succ, 'Found');
+    } else {
+      await sendInternal(GEO.cache, GEO.api, GEO.warn, 'Not Found');
+    }
+  }
+
+  if (shouldCharge) {
+    await sendInternal(GEO.api, GEO.db, GEO.db.color, 'Deduct $50');
+    pulse(GEO.db.x, GEO.db.y, GEO.db.color);
+    state.balance -= 50;
+    updateBal();
+    
+    if (isRetry && state.idempotency === 'off') {
+      log(`<span style="color:var(--warn)"><strong>DOUBLE CHARGE DETECTED!</strong></span> The previous ACK was lost, but the DB was charged. Because idempotency is OFF, the server charged the DB again on retry.`);
+      statBal.style.color = 'var(--warn)';
+      setTimeout(()=> statBal.style.color = 'var(--muted)', 1000);
+    } else {
+      log(`Server successfully deducted $50 from Ledger.`);
+    }
+
+    if (state.idempotency === 'on') {
+      state.cacheKeys.add(state.currentKey);
+      await sendInternal(GEO.api, GEO.cache, GEO.cache.color, 'Save Key');
+      pulse(GEO.cache.x, GEO.cache.y, GEO.cache.color);
+    }
+  }
+
+  // 3. API -> Client (ACK)
+  const ackResult = await sendPacket(GEO.api, GEO.client, 'var(--succ)', 1200, '200 OK');
+  
+  if (ackResult === 'dropped') {
+    handleTimeout("ACK (200 OK) lost in network returning to client.");
+    return;
+  }
+
+  // 4. Success
+  pulse(GEO.client.x, GEO.client.y, 'var(--succ)');
+  setClientStatus('SUCCESS', 'var(--succ)');
+  log(`<strong style="color:var(--succ)">Transaction Complete.</strong> Client received ACK.`);
+  resetUI();
+}
+
+function handleTimeout(reasonMsg) {
+  log(`<span style="color:var(--warn)"><strong>TIMEOUT.</strong></span> ${reasonMsg}`);
+  setClientStatus('TIMED OUT', 'var(--warn)');
+  
+  if (state.retryStrategy === 'none') {
+    log(`Retry Strategy is NONE. Transaction failed permanently.`);
+    resetUI();
+    return;
+  }
+
+  state.retryCount++;
+  
+  let waitMs = 1000;
+  if (state.retryStrategy === 'exp') {
+    waitMs = Math.pow(2, state.retryCount - 1) * 1000; // 1s, 2s, 4s
+  }
+  
+  log(`Waiting <strong>${waitMs/1000}s</strong> before retrying...`);
+  
+  // Simulate wait visually
+  let elapsed = 0;
+  const iv = setInterval(() => {
+    elapsed += 100;
+    if(elapsed >= waitMs) {
+      clearInterval(iv);
+      attemptRequest();
+    }
+  }, 100);
+}
+
+function resetUI() {
+  state.isAnimating = false;
+  btnPay.disabled = false; selIdem.disabled = false; selRetry.disabled = false; sliderDrop.disabled = false;
+}
+
+// ============================================================
+// LISTENERS & INIT
+// ============================================================
+sliderDrop.addEventListener('input', (e) => {
+  state.dropRate = e.target.value / 100;
+  valDrop.textContent = `${e.target.value}%`;
+});
+
+selIdem.addEventListener('change', (e) => {
+  state.idempotency = e.target.value;
+  state.cacheKeys.clear(); // Reset on toggle
+});
+
+selRetry.addEventListener('change', (e) => {
+  state.retryStrategy = e.target.value;
+});
+
+btnPay.addEventListener('click', executePayment);
+
+renderTopology();
+</script>
+</body>
+</html>

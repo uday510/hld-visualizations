@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Message Queues & Kafka — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic Colors */
+    --prod: #ffffff;
+    --cons: #50e3c2;   /* Mint */
+    --q: #ff7849;      /* Orange */
+    --p0: #4ad6ff;     /* Cyan */
+    --p1: #c084fc;     /* Purple */
+    --warn: #ff4a4a;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO & BREADCRUMB
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle { font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ============================================================
+     LAYOUT & PANELS
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 600px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row { display: flex; gap: 10px; margin-bottom: 24px; }
+  
+  select {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 20px;
+    border-radius: 50px; 
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: border-color 0.2s ease;
+    outline: none;
+    appearance: none;
+    width: 100%;
+    margin-bottom: 24px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px top 50%;
+    background-size: 10px auto;
+  }
+  select:hover { border-color: var(--ink); }
+
+  .control-group {
+    padding-top: 20px;
+    border-top: 1px dashed var(--line);
+  }
+  .control-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .control-group label .val { font-weight: 700; color: var(--ink); }
+  
+  .slider-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  input[type="range"] { flex: 1; accent-color: var(--ink); }
+
+  /* ============================================================
+     STATS & NARRATION
+     ============================================================ */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-box { border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .val-warn { color: var(--warn); }
+
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 140px;
+  }
+  .narration strong { color: var(--ink); }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: stroke 0.3s; }
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; opacity: 0.5; }
+  .packet { transition: transform 0.2s linear; }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Message <span>Queues & Kafka</span></h1>
+    <div class="subtitle">queues vs topics · competing consumers vs offsets · backpressure</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">EVENT ARCHITECTURE</div>
+      <svg id="system-svg" viewBox="0 0 800 600">
+        <g id="links-layer"></g>
+        <g id="broker-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Architecture Mode</h2>
+        <select id="mode-select">
+          <option value="queue">Standard Queue (RabbitMQ style)</option>
+          <option value="kafka">Event Streaming (Kafka style)</option>
+        </select>
+
+        <div class="control-group">
+          <label>Producer Speed <span class="val" id="val-prod">Medium</span></label>
+          <div class="slider-row"><input type="range" id="slider-prod" min="1" max="10" value="5" step="1" /></div>
+        </div>
+
+        <div class="control-group">
+          <label>Consumer Speed <span class="val" id="val-cons">Medium</span></label>
+          <div class="slider-row"><input type="range" id="slider-cons" min="1" max="10" value="5" step="1" /></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Telemetry</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Total Produced</div>
+            <div class="stat-val" id="stat-produced">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Total Consumed</div>
+            <div class="stat-val" id="stat-consumed">0</div>
+          </div>
+          <div class="stat-box" style="grid-column: 1 / -1;">
+            <div class="stat-label">Backlog / Lag (Unprocessed)</div>
+            <div class="stat-val" id="stat-lag">0</div>
+          </div>
+        </div>
+
+        <div class="narration" id="narration">
+          <strong>Standard Queue:</strong> Messages are placed in a FIFO queue. Consumers pull messages, process them, and the broker <strong>deletes</strong> them. If you have multiple consumers, they compete for messages to share the load.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const GEO = {
+  prodX: 100,
+  brokerX: 400,
+  consX: 700,
+  boxW: 240,
+  boxH: 60
+};
+
+const state = {
+  mode: 'queue', // 'queue' or 'kafka'
+  prodSpeed: 5,
+  consSpeed: 5,
+  
+  // Stats
+  produced: 0,
+  consumed: 0,
+  
+  // Timing
+  lastProdTime: 0,
+  lastConsTime: 0,
+  
+  // Data structures
+  queue: [], // For standard mode
+  kafka: {
+    p0: [], // Partition 0
+    p1: [], // Partition 1
+    offset0: 0,
+    offset1: 0
+  },
+  
+  packetsInFlight: []
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const brokerG = document.getElementById('broker-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+
+const selMode = document.getElementById('mode-select');
+const sProd = document.getElementById('slider-prod');
+const sCons = document.getElementById('slider-cons');
+const vProd = document.getElementById('val-prod');
+const vCons = document.getElementById('val-cons');
+
+const stProd = document.getElementById('stat-produced');
+const stCons = document.getElementById('stat-consumed');
+const stLag = document.getElementById('stat-lag');
+const narration = document.getElementById('narration');
+
+// ============================================================
+// SVG RENDERING (Static)
+// ============================================================
+function drawLine(x1, y1, x2, y2) {
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('class', 'link-line');
+  linksG.appendChild(line);
+}
+
+function drawNode(x, y, label, color) {
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', x - 40); c.setAttribute('y', y - 30);
+  c.setAttribute('width', 80); c.setAttribute('height', 60);
+  c.setAttribute('rx', 8); c.setAttribute('class', 'node-bg');
+  c.style.stroke = color;
+  nodesG.appendChild(c);
+
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', x); t.setAttribute('y', y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', color);
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '12'); t.setAttribute('font-weight', 'bold');
+  t.textContent = label;
+  nodesG.appendChild(t);
+}
+
+function renderTopology() {
+  linksG.innerHTML = '';
+  nodesG.innerHTML = '';
+  brokerG.innerHTML = '';
+
+  // Nodes
+  drawNode(GEO.prodX, 300, 'Producer', 'var(--prod)');
+  drawNode(GEO.consX, 220, 'Consumer 1', 'var(--cons)');
+  drawNode(GEO.consX, 380, 'Consumer 2', 'var(--cons)');
+
+  if (state.mode === 'queue') {
+    // Single Queue Box
+    const qY = 300;
+    drawLine(GEO.prodX + 40, 300, GEO.brokerX - GEO.boxW/2, qY);
+    drawLine(GEO.brokerX + GEO.boxW/2, qY, GEO.consX - 40, 220);
+    drawLine(GEO.brokerX + GEO.boxW/2, qY, GEO.consX - 40, 380);
+
+    const box = document.createElementNS(svgNS, 'rect');
+    box.setAttribute('x', GEO.brokerX - GEO.boxW/2);
+    box.setAttribute('y', qY - GEO.boxH/2);
+    box.setAttribute('width', GEO.boxW); box.setAttribute('height', GEO.boxH);
+    box.setAttribute('rx', 8); box.setAttribute('fill', '#0a0a0a'); box.setAttribute('stroke', 'var(--q)');
+    brokerG.appendChild(box);
+
+    const lbl = document.createElementNS(svgNS, 'text');
+    lbl.setAttribute('x', GEO.brokerX); lbl.setAttribute('y', qY - 40);
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('fill', 'var(--q)');
+    lbl.setAttribute('font-family', 'JetBrains Mono'); lbl.setAttribute('font-size', '12');
+    lbl.textContent = 'Message Queue (FIFO)';
+    brokerG.appendChild(lbl);
+
+  } else {
+    // Kafka - 2 Partitions
+    const p0Y = 220; const p1Y = 380;
+    drawLine(GEO.prodX + 40, 300, GEO.brokerX - GEO.boxW/2, p0Y);
+    drawLine(GEO.prodX + 40, 300, GEO.brokerX - GEO.boxW/2, p1Y);
+    drawLine(GEO.brokerX + GEO.boxW/2, p0Y, GEO.consX - 40, p0Y);
+    drawLine(GEO.brokerX + GEO.boxW/2, p1Y, GEO.consX - 40, p1Y);
+
+    // Box P0
+    const b0 = document.createElementNS(svgNS, 'rect');
+    b0.setAttribute('x', GEO.brokerX - GEO.boxW/2); b0.setAttribute('y', p0Y - GEO.boxH/2);
+    b0.setAttribute('width', GEO.boxW); b0.setAttribute('height', GEO.boxH);
+    b0.setAttribute('rx', 4); b0.setAttribute('fill', '#0a0a0a'); b0.setAttribute('stroke', 'var(--p0)');
+    brokerG.appendChild(b0);
+
+    const l0 = document.createElementNS(svgNS, 'text');
+    l0.setAttribute('x', GEO.brokerX - GEO.boxW/2); l0.setAttribute('y', p0Y - 40);
+    l0.setAttribute('fill', 'var(--p0)'); l0.setAttribute('font-family', 'JetBrains Mono'); l0.setAttribute('font-size', '10');
+    l0.textContent = 'Topic A - Partition 0';
+    brokerG.appendChild(l0);
+
+    // Box P1
+    const b1 = document.createElementNS(svgNS, 'rect');
+    b1.setAttribute('x', GEO.brokerX - GEO.boxW/2); b1.setAttribute('y', p1Y - GEO.boxH/2);
+    b1.setAttribute('width', GEO.boxW); b1.setAttribute('height', GEO.boxH);
+    b1.setAttribute('rx', 4); b1.setAttribute('fill', '#0a0a0a'); b1.setAttribute('stroke', 'var(--p1)');
+    brokerG.appendChild(b1);
+
+    const l1 = document.createElementNS(svgNS, 'text');
+    l1.setAttribute('x', GEO.brokerX - GEO.boxW/2); l1.setAttribute('y', p1Y - 40);
+    l1.setAttribute('fill', 'var(--p1)'); l1.setAttribute('font-family', 'JetBrains Mono'); l1.setAttribute('font-size', '10');
+    l1.textContent = 'Topic A - Partition 1';
+    brokerG.appendChild(l1);
+  }
+}
+
+// ============================================================
+// SIMULATION ENGINE
+// ============================================================
+function pulse(x, y, color) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', x); ring.setAttribute('cy', y);
+  ring.setAttribute('r', 10); ring.setAttribute('stroke', color);
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  let f = 0;
+  function anim() {
+    f++; ring.setAttribute('r', 10 + (f*1.5)); ring.style.opacity = 1 - (f/20);
+    if(f<20) requestAnimationFrame(anim); else ring.remove();
+  }
+  requestAnimationFrame(anim);
+}
+
+function spawnInFlight(start, end, color, duration, callback) {
+  const p = document.createElementNS(svgNS, 'circle');
+  p.setAttribute('r', 6); p.setAttribute('fill', color);
+  packetsG.appendChild(p);
+
+  const obj = { el: p, start, end, sTime: performance.now(), duration, callback };
+  state.packetsInFlight.push(obj);
+}
+
+function updateStats() {
+  stProd.textContent = state.produced;
+  stCons.textContent = state.consumed;
+  
+  let lag = 0;
+  if (state.mode === 'queue') {
+    lag = state.queue.length;
+  } else {
+    lag = (state.kafka.p0.length - state.kafka.offset0) + (state.kafka.p1.length - state.kafka.offset1);
+  }
+  
+  stLag.textContent = lag;
+  if (lag > 15) {
+    stLag.className = 'stat-val val-warn';
+    if(document.getElementById('lag-warn') === null) {
+      narration.innerHTML += `<br/><br/><strong id="lag-warn" style="color:var(--warn)">BACKPRESSURE DETECTED.</strong> Producers are out-pacing consumers. In production, this lag causes delays and eventually OOM (Out of Memory) crashes if unmonitored.`;
+    }
+  } else {
+    stLag.className = 'stat-val';
+  }
+}
+
+function renderBrokerState() {
+  // Clear old broker data
+  const old = document.querySelectorAll('.broker-data');
+  old.forEach(el => el.remove());
+
+  const blockW = 12;
+  const gap = 4;
+  const maxBlocks = Math.floor((GEO.boxW - 10) / (blockW + gap));
+
+  if (state.mode === 'queue') {
+    const qY = 300;
+    // Draw queue items (FIFO - new items push from left, old exit right)
+    // Actually simpler: items stack up left to right.
+    const startX = GEO.brokerX - GEO.boxW/2 + 10;
+    
+    // To prevent visual overflow, only show maxBlocks
+    const displayQ = state.queue.slice(0, maxBlocks);
+    
+    displayQ.forEach((msg, i) => {
+      const c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('cx', startX + (i * (blockW + gap)));
+      c.setAttribute('cy', qY);
+      c.setAttribute('r', 6);
+      c.setAttribute('fill', 'var(--q)');
+      c.setAttribute('class', 'broker-data');
+      brokerG.appendChild(c);
+    });
+
+  } else {
+    // KAFKA: Append-only logs with moving offset
+    const renderPart = (data, offset, y, color) => {
+      const startX = GEO.brokerX - GEO.boxW/2 + 10;
+      
+      // Calculate visual window if log exceeds box width
+      const shift = Math.max(0, data.length - maxBlocks);
+      const displayData = data.slice(shift, shift + maxBlocks);
+      const displayOffset = offset - shift;
+
+      displayData.forEach((msg, i) => {
+        const r = document.createElementNS(svgNS, 'rect');
+        r.setAttribute('x', startX + (i * (blockW + gap)));
+        r.setAttribute('y', y - 10);
+        r.setAttribute('width', blockW); r.setAttribute('height', 20);
+        r.setAttribute('fill', color);
+        r.setAttribute('class', 'broker-data');
+        brokerG.appendChild(r);
+      });
+
+      // Draw Offset Line
+      if (displayOffset >= 0 && displayOffset <= maxBlocks) {
+        const line = document.createElementNS(svgNS, 'line');
+        const lx = startX + (displayOffset * (blockW + gap)) - (gap/2);
+        line.setAttribute('x1', lx); line.setAttribute('y1', y - 25);
+        line.setAttribute('x2', lx); line.setAttribute('y2', y + 25);
+        line.setAttribute('stroke', 'var(--ink)'); line.setAttribute('stroke-width', 2);
+        line.setAttribute('class', 'broker-data');
+        brokerG.appendChild(line);
+      }
+    };
+
+    renderPart(state.kafka.p0, state.kafka.offset0, 220, 'var(--p0)');
+    renderPart(state.kafka.p1, state.kafka.offset1, 380, 'var(--p1)');
+  }
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+function loop(time) {
+  // --- 1. Production ---
+  const prodInterval = 1000 / state.prodSpeed;
+  if (time - state.lastProdTime > prodInterval) {
+    state.lastProdTime = time;
+    pulse(GEO.prodX, 300, 'var(--prod)');
+    state.produced++;
+
+    if (state.mode === 'queue') {
+      spawnInFlight({x: GEO.prodX+40, y:300}, {x: GEO.brokerX-GEO.boxW/2, y:300}, 'var(--q)', 300, () => {
+        state.queue.push(1);
+        renderBrokerState();
+        updateStats();
+      });
+    } else {
+      // Kafka round-robin
+      const isP0 = state.produced % 2 === 0;
+      const targetY = isP0 ? 220 : 380;
+      const color = isP0 ? 'var(--p0)' : 'var(--p1)';
+      
+      spawnInFlight({x: GEO.prodX+40, y:300}, {x: GEO.brokerX-GEO.boxW/2, y:targetY}, color, 300, () => {
+        if(isP0) state.kafka.p0.push(1);
+        else state.kafka.p1.push(1);
+        renderBrokerState();
+        updateStats();
+      });
+    }
+  }
+
+  // --- 2. Consumption ---
+  const consInterval = 1000 / state.consSpeed;
+  if (time - state.lastConsTime > consInterval) {
+    state.lastConsTime = time;
+    
+    if (state.mode === 'queue') {
+      if (state.queue.length > 0) {
+        state.queue.shift(); // Delete from queue
+        state.consumed++;
+        
+        // Randomly pick C1 or C2 to process
+        const targetY = Math.random() > 0.5 ? 220 : 380;
+        spawnInFlight({x: GEO.brokerX+GEO.boxW/2, y:300}, {x: GEO.consX-40, y:targetY}, 'var(--q)', 300, () => {
+          pulse(GEO.consX, targetY, 'var(--cons)');
+        });
+        renderBrokerState();
+        updateStats();
+      }
+    } else {
+      // Kafka - C1 reads P0, C2 reads P1
+      let consumedAny = false;
+
+      if (state.kafka.offset0 < state.kafka.p0.length) {
+        state.kafka.offset0++;
+        state.consumed++; consumedAny = true;
+        spawnInFlight({x: GEO.brokerX+GEO.boxW/2, y:220}, {x: GEO.consX-40, y:220}, 'var(--p0)', 300, () => {
+          pulse(GEO.consX, 220, 'var(--cons)');
+        });
+      }
+      
+      if (state.kafka.offset1 < state.kafka.p1.length) {
+        state.kafka.offset1++;
+        state.consumed++; consumedAny = true;
+        spawnInFlight({x: GEO.brokerX+GEO.boxW/2, y:380}, {x: GEO.consX-40, y:380}, 'var(--p1)', 300, () => {
+          pulse(GEO.consX, 380, 'var(--cons)');
+        });
+      }
+
+      if(consumedAny) {
+        renderBrokerState();
+        updateStats();
+      }
+    }
+  }
+
+  // --- 3. Animation Updates ---
+  for (let i = state.packetsInFlight.length - 1; i >= 0; i--) {
+    const p = state.packetsInFlight[i];
+    let prog = (time - p.sTime) / p.duration;
+    if (prog > 1) {
+      p.el.remove();
+      if(p.callback) p.callback();
+      state.packetsInFlight.splice(i, 1);
+    } else {
+      const cx = p.start.x + (p.end.x - p.start.x) * prog;
+      const cy = p.start.y + (p.end.y - p.start.y) * prog;
+      p.el.setAttribute('cx', cx);
+      p.el.setAttribute('cy', cy);
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+function getSpeedText(val) {
+  if (val < 4) return "Slow";
+  if (val < 8) return "Medium";
+  return "Fast";
+}
+
+sProd.addEventListener('input', (e) => {
+  state.prodSpeed = parseInt(e.target.value, 10);
+  vProd.textContent = getSpeedText(state.prodSpeed);
+});
+
+sCons.addEventListener('input', (e) => {
+  state.consSpeed = parseInt(e.target.value, 10);
+  vCons.textContent = getSpeedText(state.consSpeed);
+});
+
+selMode.addEventListener('change', (e) => {
+  state.mode = e.target.value;
+  
+  // Reset Data
+  state.queue = [];
+  state.kafka = { p0: [], p1: [], offset0: 0, offset1: 0 };
+  state.produced = 0; state.consumed = 0;
+  
+  if (state.mode === 'queue') {
+    narration.innerHTML = `<strong>Standard Queue:</strong> Messages are placed in a FIFO queue. Consumers pull messages, process them, and the broker <strong>deletes</strong> them. If you have multiple consumers, they compete for messages to share the load.`;
+  } else {
+    narration.innerHTML = `<strong>Kafka (Event Streaming):</strong> Messages are appended to partitions and stay there. Consumers don't delete messages; instead, their <strong>Offset</strong> (the white line) moves forward. This allows multiple consumer groups to read the same stream independently.`;
+  }
+  
+  renderTopology();
+  renderBrokerState();
+  updateStats();
+});
+
+// Init
+renderTopology();
+renderBrokerState();
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

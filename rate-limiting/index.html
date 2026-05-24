@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Rate Limiting — Interactive Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --ink: #ffffff;
+    --muted: #777777;
+    --line: #222222;
+    
+    /* Semantic Colors */
+    --client: #ffffff;
+    --rl: #c084fc;    /* Purple for Rate Limiter */
+    --server: #4ad6ff;/* Cyan for Server */
+    --succ: #50e3c2;  /* Mint for accepted */
+    --warn: #ff4a4a;  /* Red for dropped */
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .container { max-width: 1300px; margin: 0 auto; }
+
+  header.hero {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { font-style: italic; color: var(--muted); }
+  .subtitle { font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  
+  .panel {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  
+  .stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    height: 600px;
+    overflow: hidden;
+  }
+  .stage-label {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* ============================================================
+     CONTROLS
+     ============================================================ */
+  .btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  
+  button, select {
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 12px 16px;
+    border-radius: 50px; 
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    outline: none;
+    cursor: pointer;
+  }
+  
+  select {
+    width: 100%; margin-bottom: 24px; appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23777777%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat; background-position: right 16px top 50%; background-size: 10px auto;
+  }
+  select:hover, button:hover { border-color: var(--ink); }
+  
+  button.action { background: var(--ink); color: var(--bg); border-color: var(--ink); flex: 1; }
+  button.action:hover { opacity: 0.8; }
+  button.danger { background: transparent; color: var(--warn); border-color: var(--line); flex: 1; }
+  button.danger:hover { background: rgba(255, 74, 74, 0.1); border-color: var(--warn); }
+  button.active { background: transparent; color: var(--succ); border-color: var(--succ); }
+
+  /* ============================================================
+     STATS & NARRATION
+     ============================================================ */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .stat-box { border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .val-succ { color: var(--succ); }
+  .val-warn { color: var(--warn); }
+
+  .narration {
+    border: 1px dashed var(--line);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    min-height: 120px;
+  }
+  .narration strong { color: var(--ink); }
+
+  /* ============================================================
+     SVG ELEMENTS
+     ============================================================ */
+  .node-bg { fill: #0a0a0a; stroke: var(--line); stroke-width: 2; transition: stroke 0.3s; }
+  .link-line { stroke: var(--line); stroke-width: 2; stroke-dasharray: 4 6; fill: none; opacity: 0.5; }
+  .pulse-ring { fill: none; stroke-width: 2; pointer-events: none; }
+  
+  .rl-state-box { fill: #0a0a0a; stroke: var(--rl); stroke-width: 1; rx: 4; }
+  .rl-bar-bg { fill: var(--line); rx: 2; }
+  .rl-bar-fill { fill: var(--rl); rx: 2; transition: width 0.1s linear; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+    <h1>Rate <span>Limiting</span></h1>
+    <div class="subtitle">token bucket vs leaky bucket vs fixed window · throttling · burst limits</div>
+  </header>
+
+  <div class="layout">
+    <div class="panel stage">
+      <div class="stage-label">API GATEWAY ARCHITECTURE</div>
+      <svg id="system-svg" viewBox="0 0 800 600">
+        <g id="links-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="packets-layer"></g>
+        <g id="effects-layer"></g>
+      </svg>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Algorithm</h2>
+        <select id="algo-select">
+          <option value="token">Token Bucket</option>
+          <option value="leaky">Leaky Bucket</option>
+          <option value="fixed">Fixed Window Counter</option>
+          <option value="sliding">Sliding Window Log</option>
+        </select>
+
+        <div class="btn-row">
+          <button id="btn-req" class="action">Send 1 Request</button>
+          <button id="btn-burst" class="action">Send Burst (x5)</button>
+        </div>
+        <div class="btn-row">
+          <button id="btn-auto" style="flex:1">Toggle Auto Traffic</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Traffic Metrics</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Accepted (200 OK)</div>
+            <div class="stat-val val-succ" id="stat-acc">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Dropped (429)</div>
+            <div class="stat-val val-warn" id="stat-drop">0</div>
+          </div>
+        </div>
+
+        <div class="narration" id="narration">
+          <strong>Token Bucket:</strong> A bucket holds up to 10 tokens and is refilled with 2 tokens per second. Each request costs 1 token. <br/><br/>Try sending a burst! Notice how it accepts the burst instantly as long as tokens are available.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const GEO = {
+  client: { x: 100, y: 250, label: 'Client', color: 'var(--client)' },
+  rl:     { x: 400, y: 250, label: 'Rate Limiter', color: 'var(--rl)' },
+  server: { x: 700, y: 250, label: 'API Server', color: 'var(--server)' }
+};
+
+const CAPACITY = 10; // Max bucket size or window limit
+
+const state = {
+  algo: 'token',
+  autoTraffic: false,
+  stats: { acc: 0, drop: 0 },
+  inFlight: [],
+  
+  // Token Bucket specific
+  tokens: CAPACITY,
+  refillRate: 2, // tokens per sec
+  lastRefill: performance.now(),
+  
+  // Leaky Bucket specific
+  queue: 0,
+  leakRate: 2, // leaks per sec
+  lastLeak: performance.now(),
+  
+  // Fixed Window specific
+  counter: 0,
+  windowDuration: 5000, // 5 seconds
+  windowStart: performance.now(),
+  
+  // Sliding Window Log specific
+  log: []
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const svgNS = 'http://www.w3.org/2000/svg';
+const linksG = document.getElementById('links-layer');
+const nodesG = document.getElementById('nodes-layer');
+const packetsG = document.getElementById('packets-layer');
+const effectsG = document.getElementById('effects-layer');
+
+const selAlgo = document.getElementById('algo-select');
+const btnReq = document.getElementById('btn-req');
+const btnBurst = document.getElementById('btn-burst');
+const btnAuto = document.getElementById('btn-auto');
+
+const statAcc = document.getElementById('stat-acc');
+const statDrop = document.getElementById('stat-drop');
+const narration = document.getElementById('narration');
+
+// ============================================================
+// SVG RENDERING
+// ============================================================
+function drawLine(p1, p2) {
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('class', 'link-line');
+  linksG.appendChild(line);
+}
+
+function drawNode(node) {
+  const w = 120, h = 60;
+  const c = document.createElementNS(svgNS, 'rect');
+  c.setAttribute('x', node.x - w/2); c.setAttribute('y', node.y - h/2);
+  c.setAttribute('width', w); c.setAttribute('height', h);
+  c.setAttribute('rx', 8); c.setAttribute('class', 'node-bg');
+  c.style.stroke = node.color;
+  nodesG.appendChild(c);
+  
+  const t = document.createElementNS(svgNS, 'text');
+  t.setAttribute('x', node.x); t.setAttribute('y', node.y + 4);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('fill', node.color);
+  t.setAttribute('font-family', 'JetBrains Mono');
+  t.setAttribute('font-size', '12'); t.setAttribute('font-weight', 'bold');
+  t.textContent = node.label;
+  nodesG.appendChild(t);
+}
+
+// Draw the dynamic inner UI of the rate limiter
+function drawRLState() {
+  const w = 140, h = 40;
+  const yOffset = 50;
+  
+  // Background Box
+  const box = document.createElementNS(svgNS, 'rect');
+  box.setAttribute('x', GEO.rl.x - w/2); box.setAttribute('y', GEO.rl.y + yOffset);
+  box.setAttribute('width', w); box.setAttribute('height', h);
+  box.setAttribute('class', 'rl-state-box');
+  nodesG.appendChild(box);
+
+  // Text Label
+  const lbl = document.createElementNS(svgNS, 'text');
+  lbl.setAttribute('x', GEO.rl.x); lbl.setAttribute('y', GEO.rl.y + yOffset + 14);
+  lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('fill', 'var(--rl)');
+  lbl.setAttribute('font-family', 'JetBrains Mono'); lbl.setAttribute('font-size', '10');
+  lbl.setAttribute('id', 'rl-label');
+  nodesG.appendChild(lbl);
+
+  // Progress Bar BG
+  const barW = 120;
+  const bg = document.createElementNS(svgNS, 'rect');
+  bg.setAttribute('x', GEO.rl.x - barW/2); bg.setAttribute('y', GEO.rl.y + yOffset + 22);
+  bg.setAttribute('width', barW); bg.setAttribute('height', 6);
+  bg.setAttribute('class', 'rl-bar-bg');
+  nodesG.appendChild(bg);
+
+  // Progress Bar Fill
+  const fill = document.createElementNS(svgNS, 'rect');
+  fill.setAttribute('x', GEO.rl.x - barW/2); fill.setAttribute('y', GEO.rl.y + yOffset + 22);
+  fill.setAttribute('width', 0); fill.setAttribute('height', 6);
+  fill.setAttribute('class', 'rl-bar-fill');
+  fill.setAttribute('id', 'rl-fill');
+  nodesG.appendChild(fill);
+}
+
+function renderTopology() {
+  linksG.innerHTML = '';
+  nodesG.innerHTML = '';
+  drawLine(GEO.client, GEO.rl);
+  drawLine(GEO.rl, GEO.server);
+  drawNode(GEO.client);
+  drawNode(GEO.rl);
+  drawNode(GEO.server);
+  drawRLState();
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+function pulse(x, y, color) {
+  const ring = document.createElementNS(svgNS, 'circle');
+  ring.setAttribute('cx', x); ring.setAttribute('cy', y);
+  ring.setAttribute('r', 20); ring.setAttribute('stroke', color);
+  ring.setAttribute('class', 'pulse-ring');
+  effectsG.appendChild(ring);
+  let f = 0;
+  function anim() {
+    f++; ring.setAttribute('r', 20 + (f*2)); ring.style.opacity = 1 - (f/20);
+    if(f<20) requestAnimationFrame(anim); else ring.remove();
+  }
+  requestAnimationFrame(anim);
+}
+
+function explode(x, y) {
+  for(let i=0; i<4; i++) {
+    const r = document.createElementNS(svgNS, 'circle');
+    r.setAttribute('cx', x); r.setAttribute('cy', y);
+    r.setAttribute('r', 4); r.setAttribute('fill', 'var(--warn)');
+    effectsG.appendChild(r);
+    
+    let f = 0;
+    const angle = (Math.PI / 2) * i + (Math.PI/4);
+    function anim() {
+      f++;
+      r.setAttribute('cx', x + Math.cos(angle) * (f*3));
+      r.setAttribute('cy', y + Math.sin(angle) * (f*3));
+      r.style.opacity = 1 - (f/15);
+      if(f<15) requestAnimationFrame(anim); else r.remove();
+    }
+    requestAnimationFrame(anim);
+  }
+}
+
+function spawnPacket(start, end, color, duration, onComplete) {
+  const p = document.createElementNS(svgNS, 'circle');
+  p.setAttribute('r', 6); p.setAttribute('fill', color);
+  packetsG.appendChild(p);
+  state.inFlight.push({ el: p, start, end, sTime: performance.now(), duration, onComplete });
+}
+
+// ============================================================
+// LOGIC
+// ============================================================
+function updateStatsUI() {
+  statAcc.textContent = state.stats.acc;
+  statDrop.textContent = state.stats.drop;
+}
+
+function updateRLUI() {
+  const lbl = document.getElementById('rl-label');
+  const fill = document.getElementById('rl-fill');
+  if(!lbl || !fill) return;
+
+  const barW = 120;
+  let pct = 0;
+
+  if (state.algo === 'token') {
+    lbl.textContent = `Tokens: ${Math.floor(state.tokens)}/${CAPACITY}`;
+    pct = state.tokens / CAPACITY;
+  } else if (state.algo === 'leaky') {
+    lbl.textContent = `Queue: ${state.queue}/${CAPACITY}`;
+    pct = state.queue / CAPACITY;
+  } else if (state.algo === 'fixed') {
+    const elapsed = performance.now() - state.windowStart;
+    const rem = Math.max(0, state.windowDuration - elapsed);
+    lbl.textContent = `Count: ${state.counter}/${CAPACITY} (${Math.ceil(rem/1000)}s)`;
+    pct = state.counter / CAPACITY;
+  } else if (state.algo === 'sliding') {
+    lbl.textContent = `Log Size: ${state.log.length}/${CAPACITY}`;
+    pct = state.log.length / CAPACITY;
+  }
+
+  fill.style.width = `${Math.min(1, Math.max(0, pct)) * barW}px`;
+  fill.style.fill = (pct >= 1 && state.algo !== 'token') ? 'var(--warn)' : 'var(--rl)';
+  if(state.algo === 'token') fill.style.fill = pct <= 0 ? 'var(--warn)' : 'var(--rl)';
+}
+
+function processRequest() {
+  pulse(GEO.client.x, GEO.client.y, 'var(--client)');
+  
+  spawnPacket(GEO.client, GEO.rl, 'var(--client)', 300, () => {
+    let accepted = false;
+
+    if (state.algo === 'token') {
+      if (state.tokens >= 1) {
+        state.tokens -= 1;
+        accepted = true;
+      }
+    } 
+    else if (state.algo === 'leaky') {
+      if (state.queue < CAPACITY) {
+        state.queue += 1;
+        accepted = true;
+      }
+    } 
+    else if (state.algo === 'fixed') {
+      if (state.counter < CAPACITY) {
+        state.counter += 1;
+        accepted = true;
+      }
+    } 
+    else if (state.algo === 'sliding') {
+      if (state.log.length < CAPACITY) {
+        state.log.push(performance.now());
+        accepted = true;
+      }
+    }
+
+    updateRLUI();
+
+    if (accepted) {
+      if (state.algo === 'leaky') {
+        // Leaky bucket queues it, background task sends it to server
+        pulse(GEO.rl.x, GEO.rl.y, 'var(--rl)');
+      } else {
+        // Immediate forward
+        pulse(GEO.rl.x, GEO.rl.y, 'var(--rl)');
+        spawnPacket(GEO.rl, GEO.server, 'var(--succ)', 300, () => {
+          pulse(GEO.server.x, GEO.server.y, 'var(--succ)');
+          state.stats.acc++;
+          updateStatsUI();
+        });
+      }
+    } else {
+      // Dropped (HTTP 429)
+      pulse(GEO.rl.x, GEO.rl.y, 'var(--warn)');
+      explode(GEO.rl.x, GEO.rl.y);
+      state.stats.drop++;
+      updateStatsUI();
+    }
+  });
+}
+
+// Background Game Loop for state management & animations
+let lastAutoReq = 0;
+function loop(time) {
+  // Update internal states based on algorithm
+  if (state.algo === 'token') {
+    const elapsedSec = (time - state.lastRefill) / 1000;
+    if (elapsedSec > 0) {
+      state.tokens = Math.min(CAPACITY, state.tokens + (elapsedSec * state.refillRate));
+      state.lastRefill = time;
+    }
+  } 
+  else if (state.algo === 'leaky') {
+    const elapsedSec = (time - state.lastLeak) / 1000;
+    const leakAmount = elapsedSec * state.leakRate;
+    if (leakAmount >= 1 && state.queue > 0) {
+      state.queue -= 1;
+      state.lastLeak = time;
+      
+      // Forward the queued request to server
+      spawnPacket(GEO.rl, GEO.server, 'var(--succ)', 300, () => {
+        pulse(GEO.server.x, GEO.server.y, 'var(--succ)');
+        state.stats.acc++;
+        updateStatsUI();
+      });
+    } else if (leakAmount >= 1) {
+      state.lastLeak = time; // nothing to leak, just reset timer
+    }
+  }
+  else if (state.algo === 'fixed') {
+    if (time - state.windowStart >= state.windowDuration) {
+      state.counter = 0;
+      state.windowStart = time;
+    }
+  }
+  else if (state.algo === 'sliding') {
+    // Remove timestamps older than 5 seconds
+    const threshold = time - 5000;
+    state.log = state.log.filter(ts => ts > threshold);
+  }
+
+  updateRLUI();
+
+  // Auto Traffic
+  if (state.autoTraffic && (time - lastAutoReq > 400)) {
+    processRequest();
+    lastAutoReq = time;
+  }
+
+  // Handle in-flight packets
+  for (let i = state.inFlight.length - 1; i >= 0; i--) {
+    const p = state.inFlight[i];
+    let prog = (time - p.sTime) / p.duration;
+    if (prog > 1) {
+      p.el.remove();
+      if(p.onComplete) p.onComplete();
+      state.inFlight.splice(i, 1);
+    } else {
+      const cx = p.start.x + (p.end.x - p.start.x) * prog;
+      const cy = p.start.y + (p.end.y - p.start.y) * prog;
+      p.el.setAttribute('cx', cx);
+      p.el.setAttribute('cy', cy);
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+btnReq.addEventListener('click', processRequest);
+btnBurst.addEventListener('click', () => {
+  for(let i=0; i<5; i++) {
+    setTimeout(processRequest, i * 80); // slight stagger for visual clarity
+  }
+});
+
+btnAuto.addEventListener('click', () => {
+  state.autoTraffic = !state.autoTraffic;
+  if(state.autoTraffic) {
+    btnAuto.classList.add('active');
+    btnAuto.textContent = "Auto Traffic: ON";
+  } else {
+    btnAuto.classList.remove('active');
+    btnAuto.textContent = "Toggle Auto Traffic";
+  }
+});
+
+selAlgo.addEventListener('change', (e) => {
+  state.algo = e.target.value;
+  
+  // Reset States
+  state.tokens = CAPACITY; state.lastRefill = performance.now();
+  state.queue = 0; state.lastLeak = performance.now();
+  state.counter = 0; state.windowStart = performance.now();
+  state.log = [];
+  state.stats = {acc:0, drop:0}; updateStatsUI();
+  
+  const narrations = {
+    'token': '<strong>Token Bucket:</strong> A bucket holds up to 10 tokens and is refilled with 2 tokens per second. Each request costs 1 token. <br/><br/>Try sending a burst! Notice how it accepts the burst instantly as long as tokens are available.',
+    'leaky': '<strong>Leaky Bucket:</strong> Requests enter a queue of size 10. The queue is processed at a strict rate of 2 requests per second. <br/><br/>Try sending a burst! Notice how the requests are queued and processed slowly, smoothing out the traffic spike.',
+    'fixed': '<strong>Fixed Window Counter:</strong> The timeline is divided into 5-second windows. Each window allows 10 requests. <br/><br/>Watch the timer. Once the window resets, you instantly get 10 new requests. This suffers from the "boundary problem" (spikes at the edge of windows).',
+    'sliding': '<strong>Sliding Window Log:</strong> Keeps a timestamp of every request. When a request arrives, timestamps older than 5 seconds are dropped. <br/><br/>This is perfectly accurate and avoids the boundary problem, but uses more memory to store logs.'
+  };
+  narration.innerHTML = narrations[state.algo];
+  updateRLUI();
+});
+
+// Init
+renderTopology();
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
