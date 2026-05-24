@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HLD Visualizations — Uday Teja</title>
+<meta name="description" content="Interactive visualizations for High-Level System Design concepts. A personal study guide built while preparing for HLD interviews."/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0e12;
+    --panel: #15171d;
+    --panel-2: #1c1f27;
+    --ink: #e8e6df;
+    --muted: #8a8b93;
+    --accent: #d4ff3a;
+    --warn: #ff7849;
+    --cyan: #4ad6ff;
+    --purple: #c084fc;
+    --pink: #ff5d8f;
+    --teal: #50e3c2;
+    --line: #2a2d36;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 24px;
+    background-image:
+      radial-gradient(circle at 15% 8%, rgba(212,255,58,0.05) 0%, transparent 45%),
+      radial-gradient(circle at 85% 75%, rgba(74,214,255,0.05) 0%, transparent 45%),
+      radial-gradient(circle at 50% 50%, rgba(192,132,252,0.03) 0%, transparent 60%);
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  header.hero {
+    padding: 60px 0 40px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 48px;
+    position: relative;
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .breadcrumb .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(40px, 7vw, 96px);
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    margin-bottom: 24px;
+  }
+  h1 .accent { color: var(--accent); font-style: italic; }
+  h1 .underline {
+    text-decoration: underline;
+    text-decoration-thickness: 4px;
+    text-underline-offset: 8px;
+    text-decoration-color: var(--cyan);
+  }
+  .lead {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 620px;
+    line-height: 1.7;
+    margin-bottom: 24px;
+  }
+  .lead strong { color: var(--ink); }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .tag {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    padding: 6px 12px;
+    border-radius: 50px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+  .tag .glyph { color: var(--accent); margin-right: 6px; }
+
+  /* ============================================================
+     SECTION
+     ============================================================ */
+  section { margin-bottom: 64px; }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .section-title {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .section-title .num {
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 400;
+    margin-right: 10px;
+    letter-spacing: 0.1em;
+  }
+  .section-meta {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ============================================================
+     CARDS
+     ============================================================ */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 22px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s ease;
+    min-height: 220px;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--card-color, var(--accent));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+  }
+  .card.live:hover {
+    border-color: var(--card-color, var(--accent));
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  }
+  .card.live:hover::before { transform: scaleX(1); }
+  .card.live { cursor: pointer; }
+  .card.coming { opacity: 0.55; cursor: not-allowed; }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+  .card-num {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    font-weight: 500;
+  }
+  .card-status {
+    font-size: 9px;
+    padding: 4px 9px;
+    border-radius: 50px;
+    letter-spacing: 0.15em;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .card-status.live {
+    background: var(--card-color, var(--accent));
+    color: #0d0e12;
+  }
+  .card-status.soon {
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+
+  .card-icon {
+    font-family: 'Fraunces', serif;
+    font-size: 36px;
+    font-weight: 900;
+    font-style: italic;
+    color: var(--card-color, var(--accent));
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .card-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 16px;
+    flex-grow: 1;
+  }
+  .card-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+  }
+  .card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .card-tag {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .card-arrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    color: var(--card-color, var(--accent));
+    transition: transform 0.25s ease;
+  }
+  .card.live:hover .card-arrow {
+    transform: translateX(4px);
+  }
+
+  /* Featured card — full width, special treatment */
+  .featured {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, var(--panel) 0%, var(--panel-2) 100%);
+    border: 1px solid var(--card-color, var(--accent));
+    padding: 32px;
+    min-height: auto;
+  }
+  .featured::before { transform: scaleX(1); height: 4px; }
+  .featured .card-head { margin-bottom: 18px; }
+  .featured .card-icon { font-size: 64px; margin-bottom: 12px; }
+  .featured .card-title { font-size: 32px; margin-bottom: 12px; }
+  .featured .card-desc { font-size: 13px; max-width: 640px; }
+  .featured-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: center;
+  }
+  @media (max-width: 720px) {
+    .featured-row { grid-template-columns: 1fr; }
+  }
+  .featured-cta {
+    background: var(--card-color, var(--accent));
+    color: #0d0e12;
+    padding: 14px 28px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+  .featured-cta:hover {
+    transform: translateX(4px);
+    box-shadow: 0 8px 24px rgba(212,255,58,0.3);
+  }
+
+  /* ============================================================
+     ABOUT / FOOTER
+     ============================================================ */
+  .about {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 32px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+  @media (max-width: 720px) {
+    .about { grid-template-columns: 1fr; }
+  }
+  .about h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+  .about p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .about a { color: var(--accent); text-decoration: none; }
+  .about a:hover { text-decoration: underline; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 32px 0 16px;
+    letter-spacing: 0.05em;
+    border-top: 1px dashed var(--line);
+    margin-top: 48px;
+  }
+  footer .heart { color: var(--warn); }
+
+  /* Decorative ring graphic in hero */
+  .hero-deco {
+    position: absolute;
+    right: -80px;
+    top: 20px;
+    width: 280px;
+    height: 280px;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  @media (max-width: 900px) { .hero-deco { display: none; } }
+  .hero-deco circle.ring {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1;
+    stroke-dasharray: 3 5;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header class="hero">
+    <svg class="hero-deco" viewBox="0 0 280 280">
+      <circle class="ring" cx="140" cy="140" r="130"/>
+      <circle cx="140" cy="10" r="7" fill="#ff7849"/>
+      <circle cx="265" cy="160" r="7" fill="#4ad6ff"/>
+      <circle cx="60" cy="240" r="7" fill="#d4ff3a"/>
+      <circle cx="40" cy="80" r="5" fill="#c084fc" opacity="0.6"/>
+      <circle cx="200" cy="60" r="5" fill="#ff5d8f" opacity="0.6"/>
+      <circle cx="220" cy="230" r="5" fill="#50e3c2" opacity="0.6"/>
+    </svg>
+
+    <div class="breadcrumb">
+      <span class="dot"></span>
+      <span>viz.udayteja.com · personal study notebook</span>
+    </div>
+
+    <h1>
+      System <span class="accent">Design</span><br/>
+      <span class="underline">Visualized</span>.
+    </h1>
+
+    <p class="lead">
+      Interactive visualizations for High-Level Design concepts.
+      Built while preparing for HLD interviews — each topic gets its own playable demo
+      so the trade-offs become <strong>obvious by clicking, not by reading</strong>.
+    </p>
+
+    <div class="meta-row">
+      <span class="tag"><span class="glyph">+</span>by Uday Teja</span>
+      <span class="tag"><span class="glyph">⟶</span>updated regularly</span>
+      <span class="tag"><span class="glyph">★</span>open source</span>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       PHASE 1: FOUNDATIONS
+       ============================================================ -->
+  <section>
+    <div class="section-header">
+      <h2 class="section-title"><span class="num">01 /</span>Foundations</h2>
+      <span class="section-meta">Core building blocks</span>
+    </div>
+    <div class="grid">
+
+      <a href="./consistent-hashing/" class="card featured live" style="--card-color: #d4ff3a;">
+        <div class="featured-row">
+          <div>
+            <div class="card-head">
+              <div class="card-num">01 · 04</div>
+              <span class="card-status live">Live</span>
+            </div>
+            <div class="card-icon">◐</div>
+            <div class="card-title">Consistent Hashing</div>
+            <p class="card-desc">
+              Build a hash ring, add servers, watch keys redistribute.
+              Toggle virtual nodes from 1 to 200 and see load imbalance collapse.
+              The canonical demo for understanding why <code style="color:#d4ff3a">hash % N</code>
+              fails and why distributed caches use what they use.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">▸ DISTRIBUTED CACHE</span>
+              <span class="card-tag">▸ SHARDING</span>
+              <span class="card-tag">▸ LOAD BALANCING</span>
+            </div>
+          </div>
+          <a href="./consistent-hashing/" class="featured-cta">Play with it →</a>
+        </div>
+      </a>
+
+      <div class="card coming" style="--card-color: #4ad6ff;">
+        <div class="card-head">
+          <div class="card-num">02 · 04</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⇆</div>
+        <div class="card-title">Load Balancing Algorithms</div>
+        <p class="card-desc">
+          Round Robin vs Least Connections vs Power of Two Choices vs Least Response Time.
+          Send requests, simulate a slow server, watch each algorithm react in real time.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags">
+            <span class="card-tag">▸ L4 / L7</span>
+            <span class="card-tag">▸ TRAFFIC</span>
+          </div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #c084fc;">
+        <div class="card-head">
+          <div class="card-num">03 · 04</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⛁</div>
+        <div class="card-title">CAP &amp; Consistency Models</div>
+        <p class="card-desc">
+          Simulate a network partition. Choose CP or AP. See exactly which reads succeed,
+          which fail, and which return stale data — and what that means for your users.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags">
+            <span class="card-tag">▸ THEORY</span>
+            <span class="card-tag">▸ TRADE-OFFS</span>
+          </div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #ff7849;">
+        <div class="card-head">
+          <div class="card-num">04 · 04</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⊟</div>
+        <div class="card-title">DNS &amp; CDN Routing</div>
+        <p class="card-desc">
+          Trace a request from browser to origin. Watch DNS resolution, geo-routing,
+          edge caching, and cache-miss fallback to origin — the path every request takes.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags">
+            <span class="card-tag">▸ NETWORKING</span>
+            <span class="card-tag">▸ EDGE</span>
+          </div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PHASE 2: CORE COMPONENTS
+       ============================================================ -->
+  <section>
+    <div class="section-header">
+      <h2 class="section-title"><span class="num">02 /</span>Core Components</h2>
+      <span class="section-meta">Data, caching, queues</span>
+    </div>
+    <div class="grid">
+
+      <div class="card coming" style="--card-color: #ff5d8f;">
+        <div class="card-head">
+          <div class="card-num">05</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">▣</div>
+        <div class="card-title">Caching Strategies</div>
+        <p class="card-desc">
+          Cache-aside, write-through, write-back, write-around.
+          Simulate cache hits and misses, watch eviction policies in action.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ REDIS</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #50e3c2;">
+        <div class="card-head">
+          <div class="card-num">06</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⫶</div>
+        <div class="card-title">Sharding Strategies</div>
+        <p class="card-desc">
+          Range-based vs hash-based vs directory-based sharding.
+          See data distribution, hot-shard problems, and rebalancing live.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ DATABASE</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #d4ff3a;">
+        <div class="card-head">
+          <div class="card-num">07</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⇉</div>
+        <div class="card-title">Replication &amp; Quorum</div>
+        <p class="card-desc">
+          Leader-follower, multi-leader, leaderless. Tune R, W, N values.
+          See when reads see stale data and how quorum prevents split-brain.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ DURABILITY</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #4ad6ff;">
+        <div class="card-head">
+          <div class="card-num">08</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⇌</div>
+        <div class="card-title">Message Queues &amp; Kafka</div>
+        <p class="card-desc">
+          Producers, partitions, consumer groups, offsets. Watch ordering guarantees,
+          rebalancing, and back-pressure unfold visually.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ EVENT-DRIVEN</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #c084fc;">
+        <div class="card-head">
+          <div class="card-num">09</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⊘</div>
+        <div class="card-title">Rate Limiting</div>
+        <p class="card-desc">
+          Token bucket, leaky bucket, fixed window, sliding window.
+          Slam the API with traffic and see how each algorithm responds.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ THROTTLING</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #ff7849;">
+        <div class="card-head">
+          <div class="card-num">10</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⏚</div>
+        <div class="card-title">Bloom Filters</div>
+        <p class="card-desc">
+          Add items, query membership, tune bits and hash functions.
+          Watch false-positive rate change as the filter fills up.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ PROBABILISTIC</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PHASE 3: PATTERNS
+       ============================================================ -->
+  <section>
+    <div class="section-header">
+      <h2 class="section-title"><span class="num">03 /</span>Patterns</h2>
+      <span class="section-meta">Distributed system patterns</span>
+    </div>
+    <div class="grid">
+
+      <div class="card coming" style="--card-color: #d4ff3a;">
+        <div class="card-head">
+          <div class="card-num">11</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">↻</div>
+        <div class="card-title">Saga &amp; Outbox Pattern</div>
+        <p class="card-desc">
+          Distributed transactions without 2PC. Trigger a failure mid-saga,
+          watch compensating actions run. Outbox pattern keeps events durable.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ MICROSERVICES</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #ff5d8f;">
+        <div class="card-head">
+          <div class="card-num">12</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⊗</div>
+        <div class="card-title">Circuit Breaker</div>
+        <p class="card-desc">
+          Closed → open → half-open. Inject failures into a downstream service
+          and watch the breaker protect the system from cascade.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ RESILIENCE</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+      <div class="card coming" style="--card-color: #50e3c2;">
+        <div class="card-head">
+          <div class="card-num">13</div>
+          <span class="card-status soon">Soon</span>
+        </div>
+        <div class="card-icon">⇋</div>
+        <div class="card-title">Idempotency &amp; Retries</div>
+        <p class="card-desc">
+          Duplicate webhooks, network failures, retry storms.
+          Watch idempotency keys save the day and exponential backoff calm the chaos.
+        </p>
+        <div class="card-foot">
+          <div class="card-tags"><span class="card-tag">▸ RELIABILITY</span></div>
+          <span class="card-arrow">○</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ABOUT
+       ============================================================ -->
+  <section>
+    <div class="about">
+      <div>
+        <h3>Why this exists</h3>
+        <p>
+          System design concepts live in trade-offs — and trade-offs are
+          almost impossible to feel from a textbook diagram. Building these
+          interactive demos is how I'm preparing for HLD interviews: once you
+          can move a slider and watch a metric collapse, you understand the
+          concept in your bones.
+        </p>
+      </div>
+      <div>
+        <h3>About me</h3>
+        <p>
+          I'm <strong style="color:var(--ink)">Uday Teja</strong> — backend engineer
+          at <a href="https://wellnesys.com" target="_blank">Wellnesys</a>,
+          working on microservices, payment integrations, and event-driven systems.<br/><br/>
+          <a href="https://udayteja.com" target="_blank">udayteja.com</a> ·
+          <a href="https://github.com/" target="_blank">github</a> ·
+          <a href="https://leetcode.com/" target="_blank">leetcode</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    built with curiosity <span class="heart">♥</span> · code on
+    <a href="https://github.com/" target="_blank" style="color:var(--accent);text-decoration:none">github</a>
+    · hosted on vercel
+  </footer>
+
+</div>
+
+</body>
+</html>
