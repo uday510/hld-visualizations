@@ -408,15 +408,20 @@ function animatePacket(startX, endX, y, color, hitsWall, onComplete) {
   packetsG.appendChild(packet);
 
   let progress = 0;
-  const targetX = hitsWall ? 400 : endX; // 400 is the middle/partition
+  const targetX = hitsWall ? 400 : endX;
+  const DURATION = 550;
+  let lastTime = null;
 
-  function anim() {
-    progress += 0.03;
+  function anim(timestamp) {            // ← timestamp parameter here
+    if (lastTime === null) lastTime = timestamp;
+    progress += (timestamp - lastTime) / DURATION;
+    lastTime = timestamp;
+
     if (progress >= 1) {
       packet.remove();
       state.animating = false;
       if (hitsWall) {
-        pulseAt(400, y, 'var(--err)'); // Explosion at partition
+        pulseAt(400, y, 'var(--err)');
       }
       if (onComplete) onComplete();
       return;

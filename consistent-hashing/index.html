@@ -479,6 +479,23 @@ function render() {
 function renderArcs() {
   arcsG.innerHTML = '';
   if (state.ring.length === 0) return;
+
+  if (state.ring.length === 1) {
+    const cur = state.ring[0];
+    const server = state.servers.find(s => s.id === cur.serverId);
+    if (server) {
+      const c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('cx', 300); c.setAttribute('cy', 300);
+      c.setAttribute('r', RING_R);
+      c.setAttribute('stroke', server.color);
+      c.setAttribute('stroke-width', '8');
+      c.setAttribute('fill', 'none');
+      c.setAttribute('opacity', '0.35');
+      arcsG.appendChild(c);
+    }
+    return; 
+  }
+  
   // Each vnode owns the arc from previous-vnode-pos+1 to its own pos
   for (let i = 0; i < state.ring.length; i++) {
     const cur = state.ring[i];

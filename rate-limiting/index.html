@@ -527,7 +527,7 @@ function loop(time) {
     const elapsedSec = (time - state.lastLeak) / 1000;
     const leakAmount = elapsedSec * state.leakRate;
     if (leakAmount >= 1 && state.queue > 0) {
-      state.queue -= 1;
+      state.queue -= Math.min(Math.floor(leakAmount), state.queue);
       state.lastLeak = time;
       
       // Forward the queued request to server

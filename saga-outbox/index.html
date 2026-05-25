@@ -590,7 +590,7 @@ async function runSaga() {
     await sendPacket(GEO.paySvc, GEO.payDB, GEO.paySvc.color, 'Refund', 300);
     pulse(GEO.payDB.x, GEO.payDB.y, GEO.paySvc.color);
     setLog('PAYMENT', `<strong>COMPENSATING ACTION:</strong> Successfully refunded $50 to customer.`);
-    setStatus(statPay, 'REFUNDED', 'warn');
+    setStatus(statPay, 'REFUNDED', 'done');
     
     await sendPacket(GEO.paySvc, GEO.broker, GEO.paySvc.color, 'Refunded');
     pulse(GEO.broker.x, GEO.broker.y, GEO.broker.color);

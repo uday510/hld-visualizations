@@ -648,7 +648,10 @@ function update(time) {
     packetG.appendChild(c);
   });
 
-  requestAnimationFrame(update);
+  if (state.trafficRate > 0 || state.packets.length > 0) {
+    requestAnimationFrame(update);
+  }
+  
 }
 
 // ============================================================

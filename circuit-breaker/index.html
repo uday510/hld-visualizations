@@ -485,6 +485,7 @@ function startTimer() {
 }
 
 function transitionState(newState) {
+  if (state.cbState === newState) return;
   state.cbState = newState;
   
   if (newState === 'OPEN') {

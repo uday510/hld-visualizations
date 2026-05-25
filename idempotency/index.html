@@ -549,9 +549,9 @@ async function attemptRequest() {
     if (state.cacheKeys.has(state.currentKey)) {
       log(`<strong style="color:var(--succ)">IDEMPOTENCY HIT!</strong> Server recognizes key ${state.currentKey}. Skipping DB charge, returning cached success.`);
       shouldCharge = false;
-      await sendInternal(GEO.cache, GEO.api, GEO.succ, 'Found');
+      await sendInternal(GEO.cache, GEO.api, 'var(--succ)', 'Found');
     } else {
-      await sendInternal(GEO.cache, GEO.api, GEO.warn, 'Not Found');
+      await sendInternal(GEO.cache, GEO.api, 'var(--warn)', 'Not Found');
     }
   }
 

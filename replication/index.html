@@ -584,7 +584,7 @@ async function doRead() {
   targets.forEach(t => pulseNode(GEO.replicaX, t.y, t.color));
   
   // Send packets back
-  await sendPackets({x: GEO.replicaX, y: 300}, [], 'transparent'); // fake delay
+  await new Promise(resolve => setTimeout(resolve, 100)); // fake delay
   
   // Send actual data packets back to coordinator
   const returnPromises = targets.map(t => {

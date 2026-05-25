@@ -340,7 +340,7 @@ function getHashes(str, k, max) {
   for(let j=0; j<k; j++) {
     let h = seeds[j];
     for(let i=0; i<str.length; i++) {
-      h = Math.imul(seeds[j], h) + str.charCodeAt(i) | 0;
+      h = Math.imul(31, h) + str.charCodeAt(i) | 0;
     }
     hashes.push(Math.abs(h) % max);
   }
